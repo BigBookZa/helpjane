@@ -29,7 +29,11 @@ const LoginForm: React.FC = () => {
         showSuccess('Account created successfully!');
       }
     } catch (error: any) {
-      showError(error.response?.data?.error || 'Authentication failed');
+      console.error('Authentication error:', error);
+      const errorMessage = error.response?.data?.error || 
+                          error.message || 
+                          'Authentication failed';
+      showError(errorMessage);
     } finally {
       setIsLoading(false);
     }
