@@ -1,4 +1,5 @@
 import db from '../database/connection';
+import fs from 'fs';
 
 export interface FileRecord {
   id: number;
@@ -30,7 +31,186 @@ export interface FileRecord {
   processed_at?: string;
 }
 
+export interface CreateFileData {
+  project_id: number;
+  user_id: number;
+  filename: string;
+  original_filename: string;
+  file_size: number;
+  file_path: string;
+  thumbnail_path?: string;
+  mime_type?: string;
+  status?: 'queued' | 'processing' | 'completed' | 'error';
+}
+
 export class FileModel {
+  private static createFileStmt = db.prepare(`
+    INSERT INTO files (
+      project_id, user_id, filename, original_filename, file_size, 
+      file_path, thumbnail_path, mime_type, status, keywords, keys_adobe, tags
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  private static findByIdStmt = db.prepare(`
+    SELECT * FROM files WHERE id = ? AND user_id = ?
+  `);
+
+  private static findByProjectStmt = db.prepare(`
+    SELECT * FROM files WHERE project_id = ? AND user_id = ? 
+    ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `);
+
+  private static updateFileStmt = db.prepare(`
+    UPDATE files SET 
+      new_name_photo = ?, title_adobe = ?, description = ?, keywords = ?,
+      keys_adobe = ?, adobe_category = ?, notes = ?, tags = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND user_id = ?
+  `);
+
+  private static deleteFileStmt = db.prepare(`
+    DELETE FROM files WHERE id = ? AND user_id = ?
+  `);
+
+  private static updateStatusStmt = db.prepare(`
+    UPDATE files SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `);
+
+  static async create(fileData: CreateFileData): Promise<FileRecord> {
+    try {
+      const result = this.createFileStmt.run(
+        fileData.project_id,
+        fileData.user_id,
+        fileData.filename,
+        fileData.original_filename,
+        fileData.file_size,
+        fileData.file_path,
+        fileData.thumbnail_path || null,
+        fileData.mime_type || null,
+        fileData.status || 'queued',
+        JSON.stringify([]), // keywords
+        JSON.stringify([]), // keys_adobe
+        JSON.stringify([])  // tags
+      );
+
+      const file = this.findByIdStmt.get(result.lastInsertRowid, fileData.user_id) as FileRecord;
+      return this.parseFile(file);
+    } catch (error) {
+      console.error('Error creating file:', error);
+      throw new Error('Failed to create file record');
+    }
+  }
+
+  static findById(id: number, userId: number): FileRecord | null {
+    try {
+      const file = this.findByIdStmt.get(id, userId) as FileRecord | null;
+      return file ? this.parseFile(file) : null;
+    } catch (error) {
+      console.error('Error finding file by ID:', error);
+      return null;
+    }
+  }
+
+  static async findByProject(
+    projectId: number, 
+    options: { page?: number; limit?: number; status?: string } = {}
+  ): Promise<FileRecord[]> {
+    try {
+      const { page = 1, limit = 50, status } = options;
+      const offset = (page - 1) * limit;
+
+      let query = `
+        SELECT * FROM files 
+        WHERE project_id = ?
+      `;
+      const params: any[] = [projectId];
+
+      if (status) {
+        query += ` AND status = ?`;
+        params.push(status);
+      }
+
+      query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+
+      const stmt = db.prepare(query);
+      const files = stmt.all(...params) as FileRecord[];
+      return files.map(this.parseFile);
+    } catch (error) {
+      console.error('Error finding files by project:', error);
+      return [];
+    }
+  }
+
+  static async update(id: number, userId: number, updates: Partial<FileRecord>): Promise<FileRecord | null> {
+    try {
+      const current = this.findById(id, userId);
+      if (!current) return null;
+
+      this.updateFileStmt.run(
+        updates.new_name_photo || current.new_name_photo || null,
+        updates.title_adobe || current.title_adobe || null,
+        updates.description || current.description || null,
+        JSON.stringify(updates.keywords || current.keywords),
+        JSON.stringify(updates.keys_adobe || current.keys_adobe),
+        updates.adobe_category || current.adobe_category || null,
+        updates.notes || current.notes || null,
+        JSON.stringify(updates.tags || current.tags),
+        id,
+        userId
+      );
+
+      return this.findById(id, userId);
+    } catch (error) {
+      console.error('Error updating file:', error);
+      return null;
+    }
+  }
+
+  static async delete(id: number, userId: number): Promise<boolean> {
+    try {
+      // Get file info first to clean up files
+      const file = this.findById(id, userId);
+      if (!file) return false;
+
+      // Delete database record
+      const result = this.deleteFileStmt.run(id, userId);
+      
+      if (result.changes > 0) {
+        // Clean up physical files
+        try {
+          if (fs.existsSync(file.file_path)) {
+            fs.unlinkSync(file.file_path);
+          }
+          if (file.thumbnail_path && fs.existsSync(file.thumbnail_path)) {
+            fs.unlinkSync(file.thumbnail_path);
+          }
+        } catch (cleanupError) {
+          console.warn('Failed to clean up files:', cleanupError);
+        }
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      return false;
+    }
+  }
+
+  static async reprocess(id: number, userId: number): Promise<FileRecord | null> {
+    try {
+      const file = this.findById(id, userId);
+      if (!file) return null;
+
+      this.updateStatusStmt.run('queued', id);
+      return this.findById(id, userId);
+    } catch (error) {
+      console.error('Error reprocessing file:', error);
+      return null;
+    }
+  }
+
   static getRecentFiles(userId: number, limit: number): FileRecord[] {
     try {
       const stmt = db.prepare(`
@@ -118,17 +298,6 @@ export class FileModel {
     } catch (error) {
       console.error('Error getting recent activity:', error);
       return [];
-    }
-  }
-
-  static getDatabaseSize(): number {
-    try {
-      // SQLite doesn't have a direct way to get database size
-      // This is a placeholder implementation
-      return 0;
-    } catch (error) {
-      console.error('Error getting database size:', error);
-      return 0;
     }
   }
 

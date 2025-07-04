@@ -84,21 +84,36 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0 || !projectId) return;
+    if (selectedFiles.length === 0) {
+      showError('Please select files to upload');
+      return;
+    }
+    
+    if (!projectId) {
+      showError('No project selected');
+      return;
+    }
     
     setUploading(true);
     try {
+      console.log('Uploading files:', selectedFiles.length, 'to project:', projectId);
+      
       const result = await uploadFiles({
         files: selectedFiles,
         projectId
       });
 
-      showSuccess(`${result.files.length} files uploaded successfully`);
-      onFilesUploaded?.(result.files);
+      console.log('Upload result:', result);
+      showSuccess(`${selectedFiles.length} files uploaded successfully`);
+      onFilesUploaded?.(result.files || []);
       setSelectedFiles([]);
       setErrors([]);
     } catch (error: any) {
-      showError(error.response?.data?.error || 'Upload failed');
+      console.error('Upload error:', error);
+      const errorMessage = error.response?.data?.error || 
+                          error.message || 
+                          'Upload failed';
+      showError(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -131,7 +146,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
           multiple
           accept={allowedFormats.map(format => `.${format}`).join(',')}
           onChange={handleFileInput}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          disabled={uploading}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         />
         
         <div className="space-y-4">
@@ -210,12 +226,28 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 
                 <button
                   onClick={() => removeFile(index)}
-                  className="p-1 text-gray-400 hover:text-red-600 rounded"
+                  disabled={uploading}
+                  className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Project Selection Warning */}
+      {!projectId && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-yellow-800">No Project Selected</h4>
+              <p className="text-sm text-yellow-700 mt-1">
+                Please select a project before uploading files.
+              </p>
+            </div>
           </div>
         </div>
       )}

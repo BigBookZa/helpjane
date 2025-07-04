@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Save, X, FolderOpen, HardDrive, Cloud, Tag } from 'lucide-react';
 import { useStore, Project } from '../store/useStore';
+import { createProject } from '../services/api';
+import { useNotifications } from '../hooks/useNotifications';
 
 interface ProjectModalProps {
   project?: Project;
@@ -13,20 +15,22 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
   isOpen,
   onClose
 }) => {
-  const addProject = useStore((state) => state.addProject);
   const updateProject = useStore((state) => state.updateProject);
+  const loadProjects = useStore((state) => state.loadProjects);
+  const { showSuccess, showError } = useNotifications();
   
   const [formData, setFormData] = useState({
     name: project?.name || '',
     description: project?.description || '',
     category: project?.category || 'general',
     storage: project?.storage || 'local' as 'local' | 'yandex',
-    thumbnailSize: project?.thumbnailSize || 'medium' as 'small' | 'medium' | 'large',
+    thumbnail_size: project?.thumbnail_size || 'medium' as 'small' | 'medium' | 'large',
     tags: project?.tags || [],
   });
 
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const categories = [
     { value: 'general', label: 'General' },
@@ -60,14 +64,28 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
-    if (validateForm()) {
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    try {
       if (project) {
+        // Update existing project
         updateProject(project.id, formData);
+        showSuccess('Project updated successfully');
       } else {
-        addProject(formData);
+        // Create new project via API
+        await createProject(formData);
+        showSuccess('Project created successfully');
+        // Reload projects to get the new one from server
+        await loadProjects();
       }
       onClose();
+    } catch (error: any) {
+      console.error('Project save error:', error);
+      showError(error.response?.data?.error || 'Failed to save project');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -111,7 +129,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+            disabled={isLoading}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -127,7 +146,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                disabled={isLoading}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 ${
                   errors.name ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Enter project name"
@@ -142,8 +162,9 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                disabled={isLoading}
                 rows={3}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 ${
                   errors.description ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Describe your project"
@@ -159,7 +180,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isLoading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 >
                   {categories.map(category => (
                     <option key={category.value} value={category.value}>
@@ -181,7 +203,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                       value="local"
                       checked={formData.storage === 'local'}
                       onChange={(e) => setFormData(prev => ({ ...prev, storage: e.target.value as 'local' | 'yandex' }))}
-                      className="text-blue-600 focus:ring-blue-500"
+                      disabled={isLoading}
+                      className="text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                     />
                     <HardDrive className="w-4 h-4 text-gray-500" />
                     <span className="text-sm text-gray-700">Local Storage</span>
@@ -193,7 +216,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                       value="yandex"
                       checked={formData.storage === 'yandex'}
                       onChange={(e) => setFormData(prev => ({ ...prev, storage: e.target.value as 'local' | 'yandex' }))}
-                      className="text-blue-600 focus:ring-blue-500"
+                      disabled={isLoading}
+                      className="text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                     />
                     <Cloud className="w-4 h-4 text-gray-500" />
                     <span className="text-sm text-gray-700">Yandex Disk</span>
@@ -213,9 +237,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                       type="radio"
                       name="thumbnailSize"
                       value={size.value}
-                      checked={formData.thumbnailSize === size.value}
-                      onChange={(e) => setFormData(prev => ({ ...prev, thumbnailSize: e.target.value as 'small' | 'medium' | 'large' }))}
-                      className="text-blue-600 focus:ring-blue-500 mt-0.5"
+                      checked={formData.thumbnail_size === size.value}
+                      onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_size: e.target.value as 'small' | 'medium' | 'large' }))}
+                      disabled={isLoading}
+                      className="text-blue-600 focus:ring-blue-500 mt-0.5 disabled:opacity-50"
                     />
                     <div>
                       <div className="text-sm font-medium text-gray-900">{size.label}</div>
@@ -236,12 +261,14 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyPress={handleTagInputKeyPress}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isLoading}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                   placeholder="Add a tag"
                 />
                 <button
                   onClick={addTag}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
                 >
                   <Tag className="w-4 h-4" />
                   <span>Add</span>
@@ -258,7 +285,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
                       <span>{tag}</span>
                       <button
                         onClick={() => removeTag(tag)}
-                        className="text-blue-500 hover:text-blue-700"
+                        disabled={isLoading}
+                        className="text-blue-500 hover:text-blue-700 disabled:opacity-50"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -273,16 +301,22 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            disabled={isLoading}
+            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+            disabled={isLoading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
           >
-            <Save className="w-4 h-4" />
-            <span>{project ? 'Update Project' : 'Create Project'}</span>
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{isLoading ? 'Saving...' : (project ? 'Update Project' : 'Create Project')}</span>
           </button>
         </div>
       </div>
