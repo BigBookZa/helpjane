@@ -29,6 +29,7 @@ interface SystemMetrics {
 
 const SystemMonitor: React.FC = () => {
   const { dashboardData, settings } = useStore();
+  const [metrics, setMetrics] = useState<SystemMetrics>({
     cpu: 45,
     memory: 62,
     storage: 78,
