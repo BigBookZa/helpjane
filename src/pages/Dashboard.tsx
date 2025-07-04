@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   FolderOpen, 
   Image, 
@@ -9,7 +9,9 @@ import {
   Activity,
   Zap,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
@@ -30,24 +32,79 @@ const Dashboard: React.FC = () => {
     error 
   } = useStore();
 
+  const [retryCount, setRetryCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    // Network status listeners
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     // Load all dashboard data on mount
     const loadData = async () => {
-      await Promise.all([
-        loadDashboardData(),
-        loadProjects(),
-        loadSettings()
-      ]);
+      if (!isOnline) return;
+      
+      try {
+        await Promise.allSettled([
+          loadDashboardData(),
+          loadProjects(),
+          loadSettings()
+        ]);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      }
     };
 
     loadData();
-  }, [loadDashboardData, loadProjects, loadSettings]);
+  }, [loadDashboardData, loadProjects, loadSettings, isOnline, retryCount]);
 
   const handleRefresh = async () => {
+    if (!isOnline) {
+      alert('You are currently offline. Please check your internet connection.');
+      return;
+    }
+    
+    setRetryCount(prev => prev + 1);
     await loadDashboardData();
   };
 
-  if (isLoading && !dashboardData) {
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+  };
+
+  // Offline state
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <WifiOff className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">You're offline</h2>
+          <p className="text-gray-600 mb-4">
+            Please check your internet connection and try again.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (isLoading && !dashboardData && retryCount === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -58,24 +115,50 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // Error state with retry
   if (error && !dashboardData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md mx-auto p-6">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load dashboard</h2>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={handleRefresh}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            Try Again
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={handleRetry}
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Retrying...' : 'Try Again'}</span>
+            </button>
+            <button 
+              onClick={() => navigate('/settings')}
+              className="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+            >
+              Check Settings
+            </button>
+          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <details className="mt-4 text-left">
+              <summary className="cursor-pointer text-sm text-gray-500">
+                Technical Details
+              </summary>
+              <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono text-gray-700">
+                Error: {error}
+                <br />
+                Retry Count: {retryCount}
+                <br />
+                Online: {isOnline ? 'Yes' : 'No'}
+              </div>
+            </details>
+          )}
         </div>
       </div>
     );
   }
 
+  // Fallback data for when API is unavailable but we want to show the UI
   const stats = dashboardData?.stats || {
     totalProjects: 0,
     activeProjects: 0,
@@ -153,14 +236,25 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <Activity className="w-4 h-4" />
-            <span>System Status: </span>
+            {isOnline ? (
+              <Wifi className="w-4 h-4 text-green-500" />
+            ) : (
+              <WifiOff className="w-4 h-4 text-red-500" />
+            )}
+            <span>Status: </span>
             <span className={`font-medium ${
-              systemHealth.status === 'healthy' ? 'text-green-600' : 'text-red-600'
+              isOnline && systemHealth.status === 'healthy' ? 'text-green-600' : 'text-red-600'
             }`}>
-              {systemHealth.status}
+              {!isOnline ? 'Offline' : systemHealth.status}
             </span>
           </div>
+          
+          {error && (
+            <div className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+              API Error
+            </div>
+          )}
+          
           <button 
             onClick={handleRefresh}
             disabled={isLoading}
