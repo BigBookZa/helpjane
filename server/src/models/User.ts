@@ -20,40 +20,40 @@ export interface CreateUserData {
 }
 
 export class UserModel {
-  private static createUser = db.prepare(`
+  private static createUserStmt = db.prepare(`
     INSERT INTO users (name, email, password_hash, role)
     VALUES (?, ?, ?, ?)
   `);
 
-  private static findByEmail = db.prepare(`
+  private static findByEmailStmt = db.prepare(`
     SELECT id, name, email, role, created_at, updated_at, last_login, is_active
     FROM users WHERE email = ? AND is_active = 1
   `);
 
-  private static findById = db.prepare(`
+  private static findByIdStmt = db.prepare(`
     SELECT id, name, email, role, created_at, updated_at, last_login, is_active
     FROM users WHERE id = ? AND is_active = 1
   `);
 
-  private static updateLastLogin = db.prepare(`
+  private static updateLastLoginStmt = db.prepare(`
     UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?
   `);
 
-  private static getPasswordHash = db.prepare(`
+  private static getPasswordHashStmt = db.prepare(`
     SELECT password_hash FROM users WHERE email = ? AND is_active = 1
   `);
 
   static async create(userData: CreateUserData): Promise<User> {
     const hashedPassword = await bcrypt.hash(userData.password, 12);
     
-    const result = this.createUser.run(
+    const result = this.createUserStmt.run(
       userData.name,
       userData.email,
       hashedPassword,
       userData.role || 'user'
     );
 
-    const user = this.findById.get(result.lastInsertRowid) as User;
+    const user = this.findByIdStmt.get(result.lastInsertRowid) as User;
     if (!user) {
       throw new Error('Failed to create user');
     }
@@ -62,22 +62,22 @@ export class UserModel {
   }
 
   static findByEmail(email: string): User | null {
-    return this.findByEmail.get(email) as User | null;
+    return this.findByEmailStmt.get(email) as User | null;
   }
 
   static findById(id: number): User | null {
-    return this.findById.get(id) as User | null;
+    return this.findByIdStmt.get(id) as User | null;
   }
 
   static async validatePassword(email: string, password: string): Promise<boolean> {
-    const result = this.getPasswordHash.get(email) as { password_hash: string } | null;
+    const result = this.getPasswordHashStmt.get(email) as { password_hash: string } | null;
     if (!result) return false;
 
     return bcrypt.compare(password, result.password_hash);
   }
 
   static updateLastLogin(userId: number): void {
-    this.updateLastLogin.run(userId);
+    this.updateLastLoginStmt.run(userId);
   }
 
   static async authenticate(email: string, password: string): Promise<User | null> {
