@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true, // КРИТИЧЕСКИ ВАЖНО для отправки credentials
 });
 
 // Request interceptor to add auth headers
@@ -94,6 +95,7 @@ export const uploadFiles = async (request: { files: File[]; projectId: number })
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    withCredentials: true, // Явно указываем для multipart запросов
   });
   
   return response.data;
@@ -157,6 +159,7 @@ export const testApiConnection = async (service: string, config: any) => {
 export const exportSettings = async (): Promise<Blob> => {
   const response = await api.get('/settings/export', {
     responseType: 'blob',
+    withCredentials: true, // Важно для blob запросов
   });
   return response.data;
 };
@@ -169,6 +172,7 @@ export const importSettings = async (file: File): Promise<void> => {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    withCredentials: true, // Важно для multipart запросов
   });
 };
 
@@ -214,6 +218,7 @@ export const exportProject = async (projectId: number, format: 'json' | 'csv'): 
   const response = await api.get(`/projects/${projectId}/export`, {
     params: { format },
     responseType: 'blob',
+    withCredentials: true, // Важно для blob запросов
   });
   return response.data;
 };
@@ -226,5 +231,6 @@ export const importProject = async (file: File): Promise<void> => {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    withCredentials: true, // Важно для multipart запросов
   });
 };
