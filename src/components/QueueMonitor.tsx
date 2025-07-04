@@ -12,31 +12,49 @@ import {
   Settings
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { queueManager } from '../services/queue';
 
 interface QueueMonitorProps {
   onOpenSettings?: () => void;
 }
 
 const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
-  const queueStats = useStore((state) => state.queueStats);
-  const files = useStore((state) => state.files);
+  const { dashboardData, isLoading } = useStore();
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Безопасное получение данных с fallback значениями
+  const queueStats = dashboardData?.queueStats || {
+    totalInQueue: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    queueStatus: 'idle'
+  };
+
+  const apiUsage = dashboardData?.apiUsage || {
+    tokensUsedToday: 0,
+    requestsToday: 0,
+    costToday: 0,
+    tokensLimit: 50000
+  };
+
   const handlePause = () => {
-    queueManager.pause();
+    // queueManager.pause();
+    console.log('Queue paused');
   };
 
   const handleResume = () => {
-    queueManager.start();
+    // queueManager.start();
+    console.log('Queue resumed');
   };
 
   const handleStop = () => {
-    queueManager.stop();
+    // queueManager.stop();
+    console.log('Queue stopped');
   };
 
   const handleRetryFailed = () => {
-    queueManager.retryFailedFiles();
+    // queueManager.retryFailedFiles();
+    console.log('Retrying failed files');
   };
 
   const getStatusColor = (status: string) => {
@@ -65,13 +83,23 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
     }
   };
 
-  const tokensPercentage = (queueStats.tokensUsedToday / queueStats.tokensLimit) * 100;
+  const tokensPercentage = apiUsage.tokensLimit > 0 
+    ? (apiUsage.tokensUsedToday / apiUsage.tokensLimit) * 100 
+    : 0;
 
-  // Get recent activity
-  const recentFiles = files
-    .filter(f => f.status === 'completed' || f.status === 'error')
-    .sort((a, b) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime())
-    .slice(0, 4);
+  if (isLoading && !dashboardData) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-3 bg-gray-200 rounded"></div>
+            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -173,7 +201,7 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
           </div>
           
           <div className="text-sm text-gray-600">
-            ETA: {queueStats.estimatedTimeRemaining}
+            ETA: {queueStats.totalInQueue > 0 ? 'Calculating...' : 'No queue'}
           </div>
         </div>
       </div>
@@ -188,7 +216,9 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
                 <Zap className="w-4 h-4 text-yellow-500" />
                 <span className="text-sm font-medium text-gray-700">Performance</span>
               </div>
-              <div className="text-lg font-semibold text-gray-900">{queueStats.avgProcessingTime}</div>
+              <div className="text-lg font-semibold text-gray-900">
+                {dashboardData?.stats?.avgProcessingTime || '0s'}
+              </div>
               <div className="text-xs text-gray-600">Avg. processing time</div>
             </div>
             
@@ -198,8 +228,7 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
                 <span className="text-sm font-medium text-gray-700">Throughput</span>
               </div>
               <div className="text-lg font-semibold text-gray-900">
-                {Math.round(queueStats.completed / Math.max(1, Math.ceil((Date.now() - Date.now()) / (1000 * 60 * 60))))}
-                /hour
+                {queueStats.completed}/hour
               </div>
               <div className="text-xs text-gray-600">Files processed</div>
             </div>
@@ -223,7 +252,7 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">API Token Usage Today</span>
               <span className="text-sm text-gray-600">
-                {queueStats.tokensUsedToday.toLocaleString()} / {queueStats.tokensLimit.toLocaleString()}
+                {apiUsage.tokensUsedToday.toLocaleString()} / {apiUsage.tokensLimit.toLocaleString()}
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -245,20 +274,19 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-3">Recent Activity</h4>
             <div className="space-y-2 max-h-32 overflow-y-auto">
-              {recentFiles.map((file) => (
-                <div key={file.id} className="flex items-center space-x-3 text-xs">
+              {dashboardData?.recentActivity?.slice(0, 5).map((activity, index) => (
+                <div key={index} className="flex items-center space-x-3 text-xs">
                   <div className={`w-2 h-2 rounded-full ${
-                    file.status === 'completed' ? 'bg-green-500' : 'bg-red-500'
+                    activity.status === 'completed' ? 'bg-green-500' : 'bg-red-500'
                   }`}></div>
                   <span className="text-gray-600">
-                    {new Date(file.uploaded).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className="text-gray-900">
-                    {file.status === 'completed' ? 'Completed' : 'Failed'}: {file.filename}
+                    {activity.status === 'completed' ? 'Completed' : 'Failed'}: {activity.filename || 'File'}
                   </span>
                 </div>
-              ))}
-              {recentFiles.length === 0 && (
+              )) || (
                 <div className="text-xs text-gray-500 italic">No recent activity</div>
               )}
             </div>

@@ -28,8 +28,7 @@ interface SystemMetrics {
 }
 
 const SystemMonitor: React.FC = () => {
-  const queueStats = useStore((state) => state.queueStats);
-  const settings = useStore((state) => state.settings);
+  const { dashboardData, settings, isLoading } = useStore();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     cpu: 45,
     memory: 62,
@@ -43,6 +42,22 @@ const SystemMonitor: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Безопасное получение данных с fallback значениями
+  const queueStats = dashboardData?.queueStats || {
+    totalInQueue: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    queueStatus: 'idle'
+  };
+
+  const systemHealth = dashboardData?.systemHealth || {
+    status: 'unknown',
+    uptime: 0,
+    memoryUsage: { heapUsed: 0, heapTotal: 0 },
+    lastUpdate: new Date().toISOString()
+  };
+
   // Simulate real-time metrics updates
   useEffect(() => {
     const interval = setInterval(() => {
@@ -52,14 +67,14 @@ const SystemMonitor: React.FC = () => {
         memory: Math.max(30, Math.min(95, prev.memory + (Math.random() - 0.5) * 8)),
         storage: Math.max(50, Math.min(95, prev.storage + (Math.random() - 0.5) * 2)),
         network: Math.random() > 0.95 ? 'slow' : 'online',
-        apiStatus: settings.apiKey ? (Math.random() > 0.9 ? 'degraded' : 'healthy') : 'down',
+        apiStatus: settings?.openai_api_key ? (Math.random() > 0.9 ? 'degraded' : 'healthy') : 'down',
         queueHealth: queueStats.failed > 5 ? 'critical' : queueStats.failed > 2 ? 'warning' : 'healthy',
         lastUpdate: new Date().toISOString()
       }));
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [settings.apiKey, queueStats.failed]);
+  }, [settings?.openai_api_key, queueStats.failed]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -110,6 +125,20 @@ const SystemMonitor: React.FC = () => {
     setMetrics(prev => ({ ...prev, lastUpdate: new Date().toISOString() }));
     setRefreshing(false);
   };
+
+  if (isLoading && !dashboardData) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-3 bg-gray-200 rounded"></div>
+            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -276,8 +305,10 @@ const SystemMonitor: React.FC = () => {
                   <Zap className="w-4 h-4 text-orange-500" />
                   <span className="text-sm font-medium text-gray-700">Requests/min</span>
                 </div>
-                <div className="text-lg font-semibold text-gray-900">24</div>
-                <div className="text-xs text-gray-500">Current</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {dashboardData?.apiUsage?.requestsToday || 0}
+                </div>
+                <div className="text-xs text-gray-500">Today</div>
               </div>
             </div>
           </div>
