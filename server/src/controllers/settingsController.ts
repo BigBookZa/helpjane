@@ -5,7 +5,14 @@ import { ActivityLogger } from '../utils/activityLogger';
 export const getSettings = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const settings = SettingsModel.getUserSettings(userId);
+    let settings = {};
+    
+    try {
+      settings = SettingsModel.getUserSettings(userId);
+    } catch (error) {
+      console.warn('Failed to get user settings, using defaults:', error);
+      settings = SettingsModel.getGlobalSettings();
+    }
     
     // Don't send sensitive data to frontend
     const safeSettings = { ...settings };
@@ -22,7 +29,10 @@ export const getSettings = async (req: Request, res: Response) => {
     res.json(safeSettings);
   } catch (error) {
     console.error('Get settings error:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    res.status(500).json({ 
+      error: 'Failed to fetch settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -45,12 +55,21 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
 
     // Update settings
-    SettingsModel.setUserSettings(userId, updates);
+    try {
+      SettingsModel.setUserSettings(userId, updates);
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+      return res.status(500).json({ error: 'Failed to save settings' });
+    }
 
     // Log activity
-    ActivityLogger.log(userId, 'settings_updated', 'settings', null, {
-      updatedKeys: Object.keys(updates)
-    });
+    try {
+      ActivityLogger.log(userId, 'settings_updated', 'settings', null, {
+        updatedKeys: Object.keys(updates)
+      });
+    } catch (error) {
+      console.warn('Failed to log activity:', error);
+    }
 
     // Return updated settings (masked)
     const settings = SettingsModel.getUserSettings(userId);
@@ -65,7 +84,10 @@ export const updateSettings = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Update settings error:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    res.status(500).json({ 
+      error: 'Failed to update settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -91,16 +113,23 @@ export const testApiConnection = async (req: Request, res: Response) => {
     }
 
     // Log test activity
-    ActivityLogger.log(userId, `${service}_test`, 'api', null, {
-      service,
-      success: result.success,
-      message: result.message
-    });
+    try {
+      ActivityLogger.log(userId, `${service}_test`, 'api', null, {
+        service,
+        success: result.success,
+        message: result.message
+      });
+    } catch (error) {
+      console.warn('Failed to log test activity:', error);
+    }
 
     res.json(result);
   } catch (error) {
     console.error('API test error:', error);
-    res.status(500).json({ error: 'Failed to test API connection' });
+    res.status(500).json({ 
+      error: 'Failed to test API connection',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -187,7 +216,10 @@ export const exportSettings = async (req: Request, res: Response) => {
     res.json(exportObject);
   } catch (error) {
     console.error('Export settings error:', error);
-    res.status(500).json({ error: 'Failed to export settings' });
+    res.status(500).json({ 
+      error: 'Failed to export settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -210,6 +242,9 @@ export const importSettings = async (req: Request, res: Response) => {
     res.json({ message: 'Settings imported successfully' });
   } catch (error) {
     console.error('Import settings error:', error);
-    res.status(500).json({ error: 'Failed to import settings' });
+    res.status(500).json({ 
+      error: 'Failed to import settings',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

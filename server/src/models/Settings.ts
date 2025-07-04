@@ -12,89 +12,112 @@ export interface Setting {
 }
 
 export class SettingsModel {
-  private static getUserSettings = db.prepare(`
-    SELECT * FROM settings 
-    WHERE (user_id = ? OR is_global = 1)
-    ORDER BY is_global ASC, setting_key
-  `);
-
-  private static getGlobalSettings = db.prepare(`
-    SELECT * FROM settings WHERE is_global = 1
-  `);
-
-  private static getSetting = db.prepare(`
-    SELECT * FROM settings 
-    WHERE setting_key = ? AND (user_id = ? OR is_global = 1)
-    ORDER BY is_global ASC
-    LIMIT 1
-  `);
-
-  private static upsertSetting = db.prepare(`
-    INSERT INTO settings (user_id, setting_key, setting_value, setting_type, is_global)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, setting_key) DO UPDATE SET
-      setting_value = excluded.setting_value,
-      setting_type = excluded.setting_type,
-      updated_at = CURRENT_TIMESTAMP
-  `);
-
-  private static deleteSetting = db.prepare(`
-    DELETE FROM settings WHERE setting_key = ? AND user_id = ?
-  `);
-
   static getUserSettings(userId: number): Record<string, any> {
-    const settings = this.getUserSettings.all(userId) as Setting[];
-    return this.parseSettings(settings);
+    try {
+      const stmt = db.prepare(`
+        SELECT * FROM settings 
+        WHERE (user_id = ? OR is_global = 1)
+        ORDER BY is_global ASC, setting_key
+      `);
+      const settings = stmt.all(userId) as Setting[];
+      return this.parseSettings(settings);
+    } catch (error) {
+      console.error('Error getting user settings:', error);
+      return this.getGlobalSettings();
+    }
   }
 
   static getGlobalSettings(): Record<string, any> {
-    const settings = this.getGlobalSettings.all() as Setting[];
-    return this.parseSettings(settings);
+    try {
+      const stmt = db.prepare(`SELECT * FROM settings WHERE is_global = 1`);
+      const settings = stmt.all() as Setting[];
+      return this.parseSettings(settings);
+    } catch (error) {
+      console.error('Error getting global settings:', error);
+      return {};
+    }
   }
 
   static getSetting(key: string, userId?: number): any {
-    const setting = this.getSetting.get(key, userId || null) as Setting | null;
-    if (!setting) return null;
+    try {
+      const stmt = db.prepare(`
+        SELECT * FROM settings 
+        WHERE setting_key = ? AND (user_id = ? OR is_global = 1)
+        ORDER BY is_global ASC
+        LIMIT 1
+      `);
+      const setting = stmt.get(key, userId || null) as Setting | null;
+      if (!setting) return null;
 
-    return this.parseValue(setting.setting_value, setting.setting_type);
+      return this.parseValue(setting.setting_value, setting.setting_type);
+    } catch (error) {
+      console.error('Error getting setting:', error);
+      return null;
+    }
   }
 
   static setSetting(key: string, value: any, type: Setting['setting_type'], userId?: number, isGlobal = false): void {
-    const stringValue = this.stringifyValue(value, type);
-    
-    this.upsertSetting.run(
-      isGlobal ? null : userId,
-      key,
-      stringValue,
-      type,
-      isGlobal ? 1 : 0
-    );
+    try {
+      const stringValue = this.stringifyValue(value, type);
+      
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO settings (user_id, setting_key, setting_value, setting_type, is_global, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `);
+      
+      stmt.run(
+        isGlobal ? null : userId,
+        key,
+        stringValue,
+        type,
+        isGlobal ? 1 : 0
+      );
+    } catch (error) {
+      console.error('Error setting setting:', error);
+      throw error;
+    }
   }
 
   static setUserSettings(userId: number, settings: Record<string, any>): void {
-    const transaction = db.transaction(() => {
-      for (const [key, value] of Object.entries(settings)) {
-        const type = this.inferType(value);
-        this.setSetting(key, value, type, userId, false);
-      }
-    });
+    try {
+      const transaction = db.transaction(() => {
+        for (const [key, value] of Object.entries(settings)) {
+          const type = this.inferType(value);
+          this.setSetting(key, value, type, userId, false);
+        }
+      });
 
-    transaction();
+      transaction();
+    } catch (error) {
+      console.error('Error setting user settings:', error);
+      throw error;
+    }
   }
 
   static setGlobalSettings(settings: Record<string, any>): void {
-    const transaction = db.transaction(() => {
-      for (const [key, value] of Object.entries(settings)) {
-        const type = this.inferType(value);
-        this.setSetting(key, value, type, undefined, true);
-      }
-    });
+    try {
+      const transaction = db.transaction(() => {
+        for (const [key, value] of Object.entries(settings)) {
+          const type = this.inferType(value);
+          this.setSetting(key, value, type, undefined, true);
+        }
+      });
 
-    transaction();
+      transaction();
+    } catch (error) {
+      console.error('Error setting global settings:', error);
+      throw error;
+    }
   }
 
   static deleteSetting(key: string, userId: number): void {
-    this.deleteSetting.run(key, userId);
+    try {
+      const stmt = db.prepare(`DELETE FROM settings WHERE setting_key = ? AND user_id = ?`);
+      stmt.run(key, userId);
+    } catch (error) {
+      console.error('Error deleting setting:', error);
+      throw error;
+    }
   }
 
   private static parseSettings(settings: Setting[]): Record<string, any> {
@@ -111,30 +134,40 @@ export class SettingsModel {
   }
 
   private static parseValue(value: string, type: Setting['setting_type']): any {
-    switch (type) {
-      case 'number':
-        return Number(value);
-      case 'boolean':
-        return value === 'true';
-      case 'json':
-        try {
-          return JSON.parse(value);
-        } catch {
-          return null;
-        }
-      default:
-        return value;
+    try {
+      switch (type) {
+        case 'number':
+          return Number(value);
+        case 'boolean':
+          return value === 'true';
+        case 'json':
+          try {
+            return JSON.parse(value);
+          } catch {
+            return null;
+          }
+        default:
+          return value;
+      }
+    } catch (error) {
+      console.error('Error parsing value:', error);
+      return null;
     }
   }
 
   private static stringifyValue(value: any, type: Setting['setting_type']): string {
-    switch (type) {
-      case 'json':
-        return JSON.stringify(value);
-      case 'boolean':
-        return value ? 'true' : 'false';
-      default:
-        return String(value);
+    try {
+      switch (type) {
+        case 'json':
+          return JSON.stringify(value);
+        case 'boolean':
+          return value ? 'true' : 'false';
+        default:
+          return String(value);
+      }
+    } catch (error) {
+      console.error('Error stringifying value:', error);
+      return '';
     }
   }
 

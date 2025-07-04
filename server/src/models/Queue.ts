@@ -20,23 +20,6 @@ export interface QueueJob {
 }
 
 export class QueueModel {
-  private static getQueueStats = db.prepare(`
-    SELECT 
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
-      SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-      SUM(CASE WHEN status = 'retrying' THEN 1 ELSE 0 END) as retrying
-    FROM queue_jobs 
-    WHERE user_id = ?
-  `);
-
-  private static getQueueLength = db.prepare(`
-    SELECT COUNT(*) as count 
-    FROM queue_jobs 
-    WHERE status IN ('pending', 'processing', 'retrying')
-  `);
-
   static getQueueStats(userId: number): {
     pending: number;
     processing: number;
@@ -44,18 +27,49 @@ export class QueueModel {
     failed: number;
     retrying: number;
   } {
-    const result = this.getQueueStats.get(userId) as any;
-    return {
-      pending: result.pending || 0,
-      processing: result.processing || 0,
-      completed: result.completed || 0,
-      failed: result.failed || 0,
-      retrying: result.retrying || 0
-    };
+    try {
+      const stmt = db.prepare(`
+        SELECT 
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+          SUM(CASE WHEN status = 'retrying' THEN 1 ELSE 0 END) as retrying
+        FROM queue_jobs 
+        WHERE user_id = ?
+      `);
+      const result = stmt.get(userId) as any;
+      return {
+        pending: result?.pending || 0,
+        processing: result?.processing || 0,
+        completed: result?.completed || 0,
+        failed: result?.failed || 0,
+        retrying: result?.retrying || 0
+      };
+    } catch (error) {
+      console.error('Error getting queue stats:', error);
+      return {
+        pending: 0,
+        processing: 0,
+        completed: 0,
+        failed: 0,
+        retrying: 0
+      };
+    }
   }
 
   static getQueueLength(): number {
-    const result = this.getQueueLength.get() as { count: number };
-    return result.count;
+    try {
+      const stmt = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM queue_jobs 
+        WHERE status IN ('pending', 'processing', 'retrying')
+      `);
+      const result = stmt.get() as { count: number };
+      return result.count;
+    } catch (error) {
+      console.error('Error getting queue length:', error);
+      return 0;
+    }
   }
 }
