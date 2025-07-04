@@ -20,12 +20,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import ProjectModal from '../components/ProjectModal';
+import { useNotifications } from '../hooks/useNotifications';
 import ImportExportModal from '../components/ImportExportModal';
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
-  const projects = useStore((state) => state.projects);
-  const deleteProject = useStore((state) => state.deleteProject);
+  const { projects, deleteProject, loadProjects, isLoading } = useStore();
+  const { showSuccess, showError } = useNotifications();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -35,6 +36,14 @@ const Projects: React.FC = () => {
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [importExportMode, setImportExportMode] = useState<'import' | 'export'>('export');
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>();
+  
+  // Загружаем проекты при монтировании компонента
+  useEffect(() => {
+    loadProjects().catch(error => {
+      console.error('Failed to load projects:', error);
+      showError('Failed to load projects');
+    });
+  }, [loadProjects, showError]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -80,8 +89,14 @@ const Projects: React.FC = () => {
   };
 
   const handleDeleteProject = (projectId: number) => {
-    if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      deleteProject(projectId);
+    if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      try {
+        deleteProject(projectId);
+        showSuccess('Project deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+        showError('Failed to delete project');
+      }
     }
     setShowDropdown(null);
   };
@@ -140,6 +155,16 @@ const Projects: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {isLoading && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">

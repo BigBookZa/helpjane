@@ -15,6 +15,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { formatRelativeTime, formatDate } from '../utils/dateUtils';
+import { useStore } from '../store/useStore';
 
 interface ActivityLogEntry {
   id: string;
@@ -28,64 +29,22 @@ interface ActivityLogEntry {
 }
 
 const ActivityLog: React.FC = () => {
-  const [activities, setActivities] = useState<ActivityLogEntry[]>([]);
+  const { dashboardData } = useStore();
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Mock activity data
-  useEffect(() => {
-    const mockActivities: ActivityLogEntry[] = [
-      {
-        id: '1',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-        user: 'Jane Doe',
-        action: 'File uploaded',
-        category: 'file',
-        details: 'Uploaded 5 images to E-commerce Project',
-        severity: 'low'
-      },
-      {
-        id: '2',
-        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-        user: 'System',
-        action: 'Processing completed',
-        category: 'system',
-        details: 'Batch processing completed for 12 files',
-        severity: 'medium'
-      },
-      {
-        id: '3',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        user: 'Jane Doe',
-        action: 'Project created',
-        category: 'project',
-        details: 'Created new project: Real Estate Photos',
-        severity: 'low'
-      },
-      {
-        id: '4',
-        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-        user: 'System',
-        action: 'API error',
-        category: 'api',
-        details: 'OpenAI API rate limit exceeded',
-        severity: 'high'
-      },
-      {
-        id: '5',
-        timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        user: 'Jane Doe',
-        action: 'Settings updated',
-        category: 'system',
-        details: 'Updated API configuration',
-        severity: 'medium'
-      }
-    ];
-
-    setActivities(mockActivities);
-  }, []);
+  // Получаем активность из dashboardData или используем пустой массив
+  const activities: ActivityLogEntry[] = dashboardData?.activityLogs?.map((log: any) => ({
+    id: log.id.toString(),
+    timestamp: log.created_at,
+    user: log.user_name || 'System',
+    action: log.action,
+    category: log.entity_type || 'system',
+    details: log.details || '',
+    severity: log.severity || 'low'
+  })) || [];
 
   const getActionIcon = (action: string, category: string) => {
     if (action.includes('upload')) return <Upload className="w-4 h-4 text-blue-500" />;
