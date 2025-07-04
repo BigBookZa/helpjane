@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Play, 
   Pause, 
@@ -12,28 +12,14 @@ import {
   Settings
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+
 interface QueueMonitorProps {
   onOpenSettings?: () => void;
 }
 
 const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
   const { dashboardData, isLoading } = useStore();
-  const { dashboardData } = useStore();
-  // Безопасное получение данных с fallback значениями
-  const queueStats = dashboardData?.queueStats || {
-    totalInQueue: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    queueStatus: 'idle'
-  };
-
-  const apiUsage = dashboardData?.apiUsage || {
-    tokensUsedToday: 0,
-    requestsToday: 0,
-    costToday: 0,
-    tokensLimit: 50000
-  };
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Безопасное получение данных с fallback значениями
   const queueStats = dashboardData?.queueStats || {
@@ -113,10 +99,6 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
       </div>
     );
   }
-
-  const tokensPercentage = apiUsage.tokensLimit > 0 
-    ? (apiUsage.tokensUsedToday / apiUsage.tokensLimit) * 100 
-    : 0;
 
   const recentActivity = dashboardData?.recentActivity || [];
 

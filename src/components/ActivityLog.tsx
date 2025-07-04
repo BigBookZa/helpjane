@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, 
   User, 
@@ -29,18 +29,18 @@ interface ActivityLogEntry {
 }
 
 const ActivityLog: React.FC = () => {
-  const { dashboardData } = useStore();
+  const { dashboardData, isLoading } = useStore();
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Получаем активность из dashboardData или используем пустой массив
-  const activities: ActivityLogEntry[] = dashboardData?.activityLogs?.map((log: any) => ({
-    id: log.id.toString(),
-    timestamp: log.created_at,
+  const activities: ActivityLogEntry[] = dashboardData?.recentActivity?.map((log: any) => ({
+    id: log.id?.toString() || Math.random().toString(),
+    timestamp: log.created_at || new Date().toISOString(),
     user: log.user_name || 'System',
-    action: log.action,
+    action: log.action || 'Unknown action',
     category: log.entity_type || 'system',
     details: log.details || '',
     severity: log.severity || 'low'
@@ -91,6 +91,20 @@ const ActivityLog: React.FC = () => {
     
     return true;
   });
+
+  if (isLoading && !dashboardData) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-3 bg-gray-200 rounded"></div>
+            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">

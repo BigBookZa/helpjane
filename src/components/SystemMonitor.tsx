@@ -28,7 +28,7 @@ interface SystemMetrics {
 }
 
 const SystemMonitor: React.FC = () => {
-  const { dashboardData, settings } = useStore();
+  const { dashboardData, settings, isLoading } = useStore();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     cpu: 45,
     memory: 62,
@@ -41,22 +41,6 @@ const SystemMonitor: React.FC = () => {
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Безопасное получение данных с fallback значениями
-  const queueStats = dashboardData?.queueStats || {
-    totalInQueue: 0,
-    processing: 0,
-    completed: 0,
-    failed: 0,
-    queueStatus: 'idle'
-  };
-
-  const systemHealth = dashboardData?.systemHealth || {
-    status: 'unknown',
-    uptime: 0,
-    memoryUsage: { heapUsed: 0, heapTotal: 0 },
-    lastUpdate: new Date().toISOString()
-  };
 
   // Безопасное получение данных с fallback значениями
   const queueStats = dashboardData?.queueStats || {
