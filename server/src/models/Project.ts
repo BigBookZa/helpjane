@@ -28,38 +28,38 @@ export interface CreateProjectData {
 }
 
 export class ProjectModel {
-  private static createProject = db.prepare(`
+  private static createProjectStmt = db.prepare(`
     INSERT INTO projects (user_id, name, description, category, storage, thumbnail_size, tags)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  private static findById = db.prepare(`
+  private static findByIdStmt = db.prepare(`
     SELECT * FROM projects WHERE id = ? AND user_id = ?
   `);
 
-  private static findByUser = db.prepare(`
+  private static findByUserStmt = db.prepare(`
     SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC
   `);
 
-  private static updateProject = db.prepare(`
+  private static updateProjectStmt = db.prepare(`
     UPDATE projects SET 
       name = ?, description = ?, category = ?, storage = ?, 
       thumbnail_size = ?, tags = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND user_id = ?
   `);
 
-  private static updateStats = db.prepare(`
+  private static updateStatsStmt = db.prepare(`
     UPDATE projects SET 
       files_count = ?, processed_count = ?, error_count = ?, 
       status = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
 
-  private static deleteProject = db.prepare(`
+  private static deleteProjectStmt = db.prepare(`
     DELETE FROM projects WHERE id = ? AND user_id = ?
   `);
 
-  private static getProjectStats = db.prepare(`
+  private static getProjectStatsStmt = db.prepare(`
     SELECT 
       COUNT(*) as total_files,
       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_files,
@@ -69,76 +69,105 @@ export class ProjectModel {
   `);
 
   static create(projectData: CreateProjectData): Project {
-    const tags = JSON.stringify(projectData.tags || []);
-    
-    const result = this.createProject.run(
-      projectData.user_id,
-      projectData.name,
-      projectData.description || '',
-      projectData.category || 'general',
-      projectData.storage || 'local',
-      projectData.thumbnail_size || 'medium',
-      tags
-    );
+    try {
+      const tags = JSON.stringify(projectData.tags || []);
+      
+      const result = this.createProjectStmt.run(
+        projectData.user_id,
+        projectData.name,
+        projectData.description || '',
+        projectData.category || 'general',
+        projectData.storage || 'local',
+        projectData.thumbnail_size || 'medium',
+        tags
+      );
 
-    const project = this.findById.get(result.lastInsertRowid, projectData.user_id) as Project;
-    return this.parseProject(project);
+      const project = this.findByIdStmt.get(result.lastInsertRowid, projectData.user_id) as Project;
+      return this.parseProject(project);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      throw new Error('Failed to create project');
+    }
   }
 
   static findById(id: number, userId: number): Project | null {
-    const project = this.findById.get(id, userId) as Project | null;
-    return project ? this.parseProject(project) : null;
+    try {
+      const project = this.findByIdStmt.get(id, userId) as Project | null;
+      return project ? this.parseProject(project) : null;
+    } catch (error) {
+      console.error('Error finding project by ID:', error);
+      return null;
+    }
   }
 
   static findByUser(userId: number): Project[] {
-    const projects = this.findByUser.all(userId) as Project[];
-    return projects.map(this.parseProject);
+    try {
+      const projects = this.findByUserStmt.all(userId) as Project[];
+      return projects.map(this.parseProject);
+    } catch (error) {
+      console.error('Error finding projects by user:', error);
+      return [];
+    }
   }
 
   static update(id: number, userId: number, updates: Partial<CreateProjectData>): Project | null {
-    const current = this.findById(id, userId);
-    if (!current) return null;
+    try {
+      const current = this.findById(id, userId);
+      if (!current) return null;
 
-    const tags = JSON.stringify(updates.tags || current.tags);
-    
-    this.updateProject.run(
-      updates.name || current.name,
-      updates.description !== undefined ? updates.description : current.description,
-      updates.category || current.category,
-      updates.storage || current.storage,
-      updates.thumbnail_size || current.thumbnail_size,
-      tags,
-      id,
-      userId
-    );
+      const tags = JSON.stringify(updates.tags || current.tags);
+      
+      this.updateProjectStmt.run(
+        updates.name || current.name,
+        updates.description !== undefined ? updates.description : current.description,
+        updates.category || current.category,
+        updates.storage || current.storage,
+        updates.thumbnail_size || current.thumbnail_size,
+        tags,
+        id,
+        userId
+      );
 
-    return this.findById(id, userId);
+      return this.findById(id, userId);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      return null;
+    }
   }
 
   static delete(id: number, userId: number): boolean {
-    const result = this.deleteProject.run(id, userId);
-    return result.changes > 0;
+    try {
+      const result = this.deleteProjectStmt.run(id, userId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      return false;
+    }
   }
 
   static updateStats(projectId: number): void {
-    const stats = this.getProjectStats.get(projectId) as any;
-    
-    let status: Project['status'] = 'active';
-    if (stats.processing_files > 0) {
-      status = 'processing';
-    } else if (stats.error_files > 0 && stats.completed_files === 0) {
-      status = 'error';
-    } else if (stats.total_files > 0 && stats.completed_files === stats.total_files) {
-      status = 'completed';
-    }
+    try {
+      const stats = this.getProjectStatsStmt.get(projectId) as any;
+      
+      let status: Project['status'] = 'active';
+      if (stats?.processing_files > 0) {
+        status = 'processing';
+      } else if (stats?.error_files > 0 && stats?.completed_files === 0) {
+        status = 'error';
+      } else if (stats?.total_files > 0 && stats?.completed_files === stats?.total_files) {
+        status = 'completed';
+      }
 
-    this.updateStats.run(
-      stats.total_files,
-      stats.completed_files,
-      stats.error_files,
-      status,
-      projectId
-    );
+      this.updateStatsStmt.run(
+        stats?.total_files || 0,
+        stats?.completed_files || 0,
+        stats?.error_files || 0,
+        status,
+        projectId
+      );
+    } catch (error) {
+      console.error('Error updating project stats:', error);
+    }
   }
 
   static getUserStats(userId: number): {
@@ -147,27 +176,47 @@ export class ProjectModel {
     total_files: number;
     processed_files: number;
   } {
-    const projectStats = db.prepare(`
-      SELECT 
-        COUNT(*) as total_projects,
-        SUM(CASE WHEN status = 'active' OR status = 'processing' THEN 1 ELSE 0 END) as active_projects,
-        SUM(files_count) as total_files,
-        SUM(processed_count) as processed_files
-      FROM projects WHERE user_id = ?
-    `).get(userId) as any;
+    try {
+      const projectStatsStmt = db.prepare(`
+        SELECT 
+          COUNT(*) as total_projects,
+          SUM(CASE WHEN status = 'active' OR status = 'processing' THEN 1 ELSE 0 END) as active_projects,
+          SUM(files_count) as total_files,
+          SUM(processed_count) as processed_files
+        FROM projects WHERE user_id = ?
+      `);
+      
+      const projectStats = projectStatsStmt.get(userId) as any;
 
-    return {
-      total_projects: projectStats.total_projects || 0,
-      active_projects: projectStats.active_projects || 0,
-      total_files: projectStats.total_files || 0,
-      processed_files: projectStats.processed_files || 0
-    };
+      return {
+        total_projects: projectStats?.total_projects || 0,
+        active_projects: projectStats?.active_projects || 0,
+        total_files: projectStats?.total_files || 0,
+        processed_files: projectStats?.processed_files || 0
+      };
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      return {
+        total_projects: 0,
+        active_projects: 0,
+        total_files: 0,
+        processed_files: 0
+      };
+    }
   }
 
   private static parseProject(project: Project): Project {
-    return {
-      ...project,
-      tags: JSON.parse(project.tags as any) || []
-    };
+    try {
+      return {
+        ...project,
+        tags: typeof project.tags === 'string' ? JSON.parse(project.tags) : (project.tags || [])
+      };
+    } catch (error) {
+      console.error('Error parsing project tags:', error);
+      return {
+        ...project,
+        tags: []
+      };
+    }
   }
 }

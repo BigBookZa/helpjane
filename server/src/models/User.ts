@@ -44,50 +44,79 @@ export class UserModel {
   `);
 
   static async create(userData: CreateUserData): Promise<User> {
-    const hashedPassword = await bcrypt.hash(userData.password, 12);
-    
-    const result = this.createUserStmt.run(
-      userData.name,
-      userData.email,
-      hashedPassword,
-      userData.role || 'user'
-    );
+    try {
+      const hashedPassword = await bcrypt.hash(userData.password, 12);
+      
+      const result = this.createUserStmt.run(
+        userData.name,
+        userData.email,
+        hashedPassword,
+        userData.role || 'user'
+      );
 
-    const user = this.findByIdStmt.get(result.lastInsertRowid) as User;
-    if (!user) {
-      throw new Error('Failed to create user');
+      const user = this.findByIdStmt.get(result.lastInsertRowid) as User;
+      if (!user) {
+        throw new Error('Failed to create user');
+      }
+
+      return user;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
     }
-
-    return user;
   }
 
   static findByEmail(email: string): User | null {
-    return this.findByEmailStmt.get(email) as User | null;
+    try {
+      return this.findByEmailStmt.get(email) as User | null;
+    } catch (error) {
+      console.error('Error finding user by email:', error);
+      return null;
+    }
   }
 
   static findById(id: number): User | null {
-    return this.findByIdStmt.get(id) as User | null;
+    try {
+      return this.findByIdStmt.get(id) as User | null;
+    } catch (error) {
+      console.error('Error finding user by ID:', error);
+      return null;
+    }
   }
 
   static async validatePassword(email: string, password: string): Promise<boolean> {
-    const result = this.getPasswordHashStmt.get(email) as { password_hash: string } | null;
-    if (!result) return false;
+    try {
+      const result = this.getPasswordHashStmt.get(email) as { password_hash: string } | null;
+      if (!result) return false;
 
-    return bcrypt.compare(password, result.password_hash);
+      return bcrypt.compare(password, result.password_hash);
+    } catch (error) {
+      console.error('Error validating password:', error);
+      return false;
+    }
   }
 
   static updateLastLogin(userId: number): void {
-    this.updateLastLoginStmt.run(userId);
+    try {
+      this.updateLastLoginStmt.run(userId);
+    } catch (error) {
+      console.error('Error updating last login:', error);
+    }
   }
 
   static async authenticate(email: string, password: string): Promise<User | null> {
-    const user = this.findByEmail(email);
-    if (!user) return null;
+    try {
+      const user = this.findByEmail(email);
+      if (!user) return null;
 
-    const isValid = await this.validatePassword(email, password);
-    if (!isValid) return null;
+      const isValid = await this.validatePassword(email, password);
+      if (!isValid) return null;
 
-    this.updateLastLogin(user.id);
-    return user;
+      this.updateLastLogin(user.id);
+      return user;
+    } catch (error) {
+      console.error('Error authenticating user:', error);
+      return null;
+    }
   }
 }

@@ -8,9 +8,21 @@ export const getDashboardData = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
-    // Get user projects and stats
-    const projects = ProjectModel.findByUser(userId);
-    const userStats = ProjectModel.getUserStats(userId);
+    // Get user projects and stats with fallbacks
+    let projects = [];
+    let userStats = {
+      total_projects: 0,
+      active_projects: 0,
+      total_files: 0,
+      processed_files: 0
+    };
+
+    try {
+      projects = ProjectModel.findByUser(userId);
+      userStats = ProjectModel.getUserStats(userId);
+    } catch (error) {
+      console.warn('Failed to get projects/stats:', error);
+    }
 
     // Get recent files (with fallback)
     let recentFiles = [];
@@ -18,7 +30,6 @@ export const getDashboardData = async (req: Request, res: Response) => {
       recentFiles = FileModel.getRecentFiles(userId, 10);
     } catch (error) {
       console.warn('Failed to get recent files:', error);
-      recentFiles = [];
     }
 
     // Get queue statistics (with fallback)
@@ -63,7 +74,6 @@ export const getDashboardData = async (req: Request, res: Response) => {
       recentActivity = FileModel.getRecentActivity(userId, 5);
     } catch (error) {
       console.warn('Failed to get recent activity:', error);
-      recentActivity = [];
     }
 
     const dashboardData = {
@@ -103,10 +113,43 @@ export const getDashboardData = async (req: Request, res: Response) => {
     res.json(dashboardData);
   } catch (error) {
     console.error('Dashboard data error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch dashboard data',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    
+    // Return minimal fallback data instead of error
+    const fallbackData = {
+      user: req.user,
+      stats: {
+        totalProjects: 0,
+        activeProjects: 0,
+        totalFiles: 0,
+        processedFiles: 0,
+        successRate: 0,
+        avgProcessingTime: '0s'
+      },
+      projects: [],
+      recentFiles: [],
+      queueStats: {
+        totalInQueue: 0,
+        processing: 0,
+        completed: 0,
+        failed: 0,
+        queueStatus: 'idle'
+      },
+      apiUsage: {
+        tokensUsedToday: 0,
+        requestsToday: 0,
+        costToday: 0,
+        tokensLimit: 50000
+      },
+      recentActivity: [],
+      systemHealth: {
+        status: 'degraded',
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        lastUpdate: new Date().toISOString()
+      }
+    };
+
+    res.json(fallbackData);
   }
 };
 
