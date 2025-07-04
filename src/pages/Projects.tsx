@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -20,8 +21,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import ProjectModal from '../components/ProjectModal';
-import { useNotifications } from '../hooks/useNotifications';
 import ImportExportModal from '../components/ImportExportModal';
+import { useNotifications } from '../hooks/useNotifications';
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();

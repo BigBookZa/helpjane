@@ -89,7 +89,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
     
-    if (!projectId) {
+    if (projectId === undefined || projectId === null) {
       showError('No project selected');
       return;
     }
@@ -104,8 +104,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
       });
 
       console.log('Upload result:', result);
-      showSuccess(`${selectedFiles.length} files uploaded successfully`);
-      onFilesUploaded?.(result.files || []);
+      if (result && result.files) {
+        showSuccess(`${result.files.length} files uploaded successfully`);
+        onFilesUploaded?.(result.files);
+      } else {
+        showSuccess(`Files uploaded successfully`);
+        onFilesUploaded?.([]);
+      }
       setSelectedFiles([]);
       setErrors([]);
     } catch (error: any) {

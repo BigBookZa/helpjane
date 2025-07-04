@@ -28,7 +28,7 @@ interface SystemMetrics {
 }
 
 const SystemMonitor: React.FC = () => {
-  const { dashboardData, settings, isLoading } = useStore();
+  const { dashboardData, settings = {}, isLoading } = useStore();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     cpu: 45,
     memory: 62,
@@ -67,14 +67,14 @@ const SystemMonitor: React.FC = () => {
         memory: Math.max(30, Math.min(95, prev.memory + (Math.random() - 0.5) * 8)),
         storage: Math.max(50, Math.min(95, prev.storage + (Math.random() - 0.5) * 2)),
         network: Math.random() > 0.95 ? 'slow' : 'online',
-        apiStatus: settings?.openai_api_key ? (Math.random() > 0.9 ? 'degraded' : 'healthy') : 'down',
+        apiStatus: settings.openai_api_key ? (Math.random() > 0.9 ? 'degraded' : 'healthy') : 'down',
         queueHealth: queueStats.failed > 5 ? 'critical' : queueStats.failed > 2 ? 'warning' : 'healthy',
         lastUpdate: new Date().toISOString()
       }));
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [settings?.openai_api_key, queueStats.failed]);
+  }, [settings.openai_api_key, queueStats.failed]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
