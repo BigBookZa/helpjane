@@ -107,11 +107,17 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
           <div className="space-y-3">
+            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const tokensPercentage = apiUsage.tokensLimit > 0 
     ? (apiUsage.tokensUsedToday / apiUsage.tokensLimit) * 100 
     : 0;
-            <div className="h-3 bg-gray-200 rounded w-5/6"></div>
-          </div>
+
   const recentActivity = dashboardData?.recentActivity || [];
 
   return (
@@ -232,8 +238,6 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
               <div className="text-lg font-semibold text-gray-900">
                 {dashboardData?.stats?.avgProcessingTime || '0s'}
               </div>
-                {dashboardData?.stats?.avgProcessingTime || '0s'}
-              </div>
               <div className="text-xs text-gray-600">Avg. processing time</div>
             </div>
             
@@ -242,6 +246,7 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
                 <TrendingUp className="w-4 h-4 text-blue-500" />
                 <span className="text-sm font-medium text-gray-700">Throughput</span>
               </div>
+              <div className="text-lg font-semibold text-gray-900">
                 {queueStats.completed}/hour
               </div>
               <div className="text-xs text-gray-600">Files processed</div>
@@ -303,6 +308,7 @@ const QueueMonitor: React.FC<QueueMonitorProps> = ({ onOpenSettings }) => {
                 </div>
                 ))
               ) : (
+                <div className="text-sm text-gray-500">No recent activity</div>
               )}
             </div>
           </div>
