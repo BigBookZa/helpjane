@@ -42,11 +42,44 @@ check_permissions() {
 
 # Обновление системы
 update_system() {
-    log "Обновление списка пакетов..."
-    apt update -y
+    log "Обновление системы и установка базовых утилит..."
     
-    log "Установка базовых пакетов..."
-    apt install -y curl wget git build-essential software-properties-common apt-transport-https ca-certificates gnupg lsb-release net-tools
+    # Обновляем систему
+    apt update -y && apt upgrade -y
+    
+    # Устанавливаем базовые утилиты
+    apt install -y \
+        curl \
+        wget \
+        git \
+        nano \
+        vim \
+        htop \
+        net-tools \
+        netstat-nat \
+        lsof \
+        unzip \
+        zip \
+        tree \
+        jq \
+        build-essential \
+        software-properties-common \
+        apt-transport-https \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        python3 \
+        python3-pip \
+        sqlite3 \
+        redis-tools \
+        systemctl \
+        service \
+        cron \
+        logrotate \
+        fail2ban \
+        ufw
+    
+    log "Базовые утилиты установлены"
 }
 
 # Установка Node.js
@@ -57,7 +90,7 @@ install_nodejs() {
         NODE_VERSION=$(node -v | sed 's/v//')
         MAJOR_VERSION=$(echo $NODE_VERSION | cut -d. -f1)
         
-        if [[ $MAJOR_VERSION -ge 18 ]]; then
+        if [[ $MAJOR_VERSION -ge 20 ]]; then
             log "Node.js $NODE_VERSION уже установлен"
             return 0
         else
@@ -65,12 +98,25 @@ install_nodejs() {
         fi
     fi
     
-    log "Установка Node.js 18..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    log "Установка Node.js 20 LTS (самая стабильная версия)..."
+    
+    # Удаляем старую версию если есть
+    apt remove -y nodejs npm 2>/dev/null || true
+    
+    # Устанавливаем Node.js 20
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt install -y nodejs
+    
+    # Обновляем npm до последней версии
+    npm install -g npm@latest
     
     log "Установлена версия Node.js: $(node -v)"
     log "Установлена версия npm: $(npm -v)"
+    
+    # Настраиваем npm для работы с legacy peer deps
+    npm config set legacy-peer-deps true
+    npm config set fund false
+    npm config set audit false
 }
 
 # Установка Redis
@@ -111,23 +157,25 @@ install_redis() {
 
 # Установка PM2 для управления процессами
 install_pm2() {
-    log "Установка PM2..."
-    if ! command -v pm2 &> /dev/null; then
-        npm install -g pm2
-        log "PM2 установлен"
-        
-        # Автоматическая настройка PM2 startup
-        log "Настройка PM2 для автозапуска..."
-        pm2 startup systemd -u root --hp /root
-        
-        # Если пользователь не root, пытаемся настроить для текущего пользователя
-        if [[ $EUID -ne 0 ]]; then
-            CURRENT_USER=$(whoami)
-            CURRENT_HOME=$(eval echo ~$CURRENT_USER)
-            pm2 startup systemd -u $CURRENT_USER --hp $CURRENT_HOME
-        fi
-    else
-        log "PM2 уже установлен"
+    log "Установка PM2 и глобальных пакетов..."
+    
+    # Устанавливаем PM2 последней версии
+    npm install -g pm2@latest
+    
+    # Устанавливаем другие полезные глобальные пакеты
+    npm install -g tsx@latest nodemon@latest typescript@latest
+    
+    log "PM2 версии $(pm2 -v) установлен"
+    
+    # Автоматическая настройка PM2 startup
+    log "Настройка PM2 для автозапуска..."
+    pm2 startup systemd -u root --hp /root
+    
+    # Если пользователь не root, пытаемся настроить для текущего пользователя
+    if [[ $EUID -ne 0 ]]; then
+        CURRENT_USER=$(whoami)
+        CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+        pm2 startup systemd -u $CURRENT_USER --hp $CURRENT_HOME
     fi
 }
 
@@ -173,20 +221,72 @@ setup_project() {
     # Установка зависимостей (если есть package.json)
     if [[ -f "package.json" ]]; then
         log "Установка зависимостей frontend..."
-        npm install
+        
+        # Очищаем кеш npm
+        npm cache clean --force
+        
+        # Удаляем старые node_modules и package-lock.json
+        rm -rf node_modules package-lock.json
+        
+        # Устанавливаем с форсированными флагами
+        npm install --legacy-peer-deps --force --no-audit --no-fund --progress=false || {
+            warn "Стандартная установка не удалась, пробуем альтернативные методы..."
+            
+            # Пробуем yarn если npm не работает
+            if ! command -v yarn &> /dev/null; then
+                log "Установка Yarn..."
+                npm install -g yarn@latest
+            fi
+            
+            log "Установка через Yarn..."
+            yarn install --ignore-engines --network-timeout 600000 || {
+                warn "Yarn тоже не помог, принудительная установка..."
+                npm install --legacy-peer-deps --force --no-audit --no-fund --unsafe-perm --progress=false --verbose
+            }
+        }
+        
+        log "✅ Frontend зависимости установлены"
     fi
     
     if [[ -f "server/package.json" ]]; then
         log "Установка зависимостей backend..."
         cd server
-        npm install
         
-        # Проверяем и добавляем tsx если его нет
-        if ! npm list tsx &> /dev/null; then
-            log "Установка tsx для TypeScript..."
-            npm install tsx --save-dev
-        fi
+        # Очищаем кеш npm
+        npm cache clean --force
         
+        # Удаляем старые node_modules и package-lock.json
+        rm -rf node_modules package-lock.json
+        
+        # Устанавливаем с форсированными флагами
+        npm install --legacy-peer-deps --force --no-audit --no-fund --progress=false || {
+            warn "Стандартная установка backend не удалась, пробуем альтернативные методы..."
+            
+            # Пробуем yarn
+            if command -v yarn &> /dev/null; then
+                log "Установка backend через Yarn..."
+                yarn install --ignore-engines --network-timeout 600000 || {
+                    warn "Yarn тоже не помог, принудительная установка backend..."
+                    npm install --legacy-peer-deps --force --no-audit --no-fund --unsafe-perm --progress=false --verbose
+                }
+            else
+                npm install --legacy-peer-deps --force --no-audit --no-fund --unsafe-perm --progress=false --verbose
+            fi
+        }
+        
+        # Проверяем и добавляем нужные пакеты если их нет
+        log "Проверка и добавление необходимых пакетов..."
+        
+        # Обновляем tsx до последней версии
+        npm install tsx@latest --save-dev --legacy-peer-deps --force
+        
+        # Обновляем TypeScript
+        npm install typescript@latest --save-dev --legacy-peer-deps --force
+        
+        # Обновляем другие dev зависимости
+        npm install nodemon@latest --save-dev --legacy-peer-deps --force
+        
+        log "✅ Backend зависимости установлены"
         cd ..
     fi
 }
@@ -362,17 +462,18 @@ EOF
         # Создаем backup
         cp tsconfig.json tsconfig.json.bak
         
-        # Обновляем tsconfig.json с правильными настройками
+    # Обновляем tsconfig.json с правильными настройками
         cat > tsconfig.json << 'EOF'
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": false,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
@@ -384,7 +485,13 @@ EOF
     "strictNullChecks": false,
     "strictPropertyInitialization": false,
     "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": false,
+    "incremental": true,
+    "isolatedModules": true
   },
   "include": [
     "src/**/*"
@@ -392,7 +499,10 @@ EOF
   "exclude": [
     "node_modules",
     "dist"
-  ]
+  ],
+  "ts-node": {
+    "esm": true
+  }
 }
 EOF
     fi
@@ -409,14 +519,29 @@ EOF
                 # Создаем backup
                 cp package.json package.json.bak
                 
-                # Обновляем скрипт start
+                # Обновляем package.json с современными версиями
                 node -e "
                 const fs = require('fs');
                 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+                
+                // Обновляем скрипты
                 if (pkg.scripts) {
                     pkg.scripts.start = 'tsx src/index.ts';
                     pkg.scripts.dev = 'tsx watch src/index.ts';
+                    pkg.scripts['dev:inspect'] = 'tsx --inspect src/index.ts';
+                    pkg.scripts.build = 'tsc';
+                    pkg.scripts['build:watch'] = 'tsc --watch';
+                    pkg.scripts.clean = 'rm -rf dist';
+                    pkg.scripts.restart = 'npm run clean && npm run build && npm start';
                 }
+                
+                // Обновляем или добавляем современные зависимости
+                if (!pkg.devDependencies) pkg.devDependencies = {};
+                pkg.devDependencies['tsx'] = '^4.0.0';
+                pkg.devDependencies['typescript'] = '^5.0.0';
+                pkg.devDependencies['nodemon'] = '^3.0.0';
+                pkg.devDependencies['@types/node'] = '^20.0.0';
+                
                 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
                 "
             fi
