@@ -464,7 +464,6 @@ main() {
     build_project
     create_management_scripts
     health_check
-    
     echo -e "${GREEN}"
     echo "🎉 Установка завершена!"
     echo ""
