@@ -89,7 +89,7 @@ const seedDatabase = async () => {
     process.exit(1);
   }
 };
-
+//
 // Run seeding if this file is executed directly
 if (require.main === module) {
   seedDatabase();
