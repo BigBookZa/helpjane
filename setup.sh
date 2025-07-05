@@ -26,25 +26,27 @@ error() {
     exit 1
 }
 
-# Проверка прав sudo
-check_sudo() {
-    if [[ $EUID -eq 0 ]]; then
-        error "Не запускайте скрипт от root! Используйте обычного пользователя с sudo правами."
-    fi
+# Проверка прав и установка прав на выполнение
+check_permissions() {
+    # Устанавливаем права на выполнение для скрипта
+    chmod +x "$0" 2>/dev/null || true
     
-    if ! sudo -n true 2>/dev/null; then
-        log "Требуются sudo права для установки системных пакетов"
-        sudo -v
+    log "Скрипт запущен от пользователя: $(whoami)"
+    
+    if [[ $EUID -eq 0 ]]; then
+        log "Запуск от root - это нормально для данного скрипта"
+    else
+        log "Запуск от обычного пользователя"
     fi
 }
 
 # Обновление системы
 update_system() {
     log "Обновление списка пакетов..."
-    sudo apt update -y
+    apt update -y
     
     log "Установка базовых пакетов..."
-    sudo apt install -y curl wget git build-essential software-properties-common apt-transport-https ca-certificates gnupg lsb-release
+    apt install -y curl wget git build-essential software-properties-common apt-transport-https ca-certificates gnupg lsb-release net-tools
 }
 
 # Установка Node.js
@@ -64,8 +66,8 @@ install_nodejs() {
     fi
     
     log "Установка Node.js 18..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-    sudo apt install -y nodejs
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    apt install -y nodejs
     
     log "Установлена версия Node.js: $(node -v)"
     log "Установлена версия npm: $(npm -v)"
@@ -87,17 +89,17 @@ install_redis() {
     fi
     
     log "Установка Redis..."
-    sudo apt install -y redis-server
+    apt install -y redis-server
     
     log "Настройка Redis..."
     # Базовая конфигурация Redis
-    sudo sed -i 's/^bind 127.0.0.1 ::1/bind 127.0.0.1/' /etc/redis/redis.conf
-    sudo sed -i 's/^# maxmemory <bytes>/maxmemory 256mb/' /etc/redis/redis.conf
-    sudo sed -i 's/^# maxmemory-policy noeviction/maxmemory-policy allkeys-lru/' /etc/redis/redis.conf
+    sed -i 's/^bind 127.0.0.1 ::1/bind 127.0.0.1/' /etc/redis/redis.conf
+    sed -i 's/^# maxmemory <bytes>/maxmemory 256mb/' /etc/redis/redis.conf
+    sed -i 's/^# maxmemory-policy noeviction/maxmemory-policy allkeys-lru/' /etc/redis/redis.conf
     
     log "Запуск и включение Redis..."
-    sudo systemctl start redis-server
-    sudo systemctl enable redis-server
+    systemctl start redis-server
+    systemctl enable redis-server
     
     # Проверка работы Redis
     if redis-cli ping | grep -q "PONG"; then
@@ -111,10 +113,19 @@ install_redis() {
 install_pm2() {
     log "Установка PM2..."
     if ! command -v pm2 &> /dev/null; then
-        sudo npm install -g pm2
-        pm2 startup
-        log "PM2 установлен. Выполните команду, которую показал PM2 выше (sudo env PATH=...)"
-        read -p "Нажмите Enter после выполнения команды PM2 startup..."
+        npm install -g pm2
+        log "PM2 установлен"
+        
+        # Автоматическая настройка PM2 startup
+        log "Настройка PM2 для автозапуска..."
+        pm2 startup systemd -u root --hp /root
+        
+        # Если пользователь не root, пытаемся настроить для текущего пользователя
+        if [[ $EUID -ne 0 ]]; then
+            CURRENT_USER=$(whoami)
+            CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+            pm2 startup systemd -u $CURRENT_USER --hp $CURRENT_HOME
+        fi
     else
         log "PM2 уже установлен"
     fi
@@ -122,37 +133,55 @@ install_pm2() {
 
 # Клонирование или обновление проекта
 setup_project() {
-    PROJECT_DIR="$HOME/helper-for-jane"
+    # Определяем директорию проекта
+    if [[ $EUID -eq 0 ]]; then
+        PROJECT_DIR="/root/helper-for-jane"
+    else
+        PROJECT_DIR="$HOME/helper-for-jane"
+    fi
     
-    if [[ -d "$PROJECT_DIR" ]]; then
+    # Если скрипт запущен из директории проекта, используем текущую директорию
+    if [[ -f "package.json" && -d "server" ]]; then
+        PROJECT_DIR=$(pwd)
+        log "Используется текущая директория проекта: $PROJECT_DIR"
+    elif [[ -d "$PROJECT_DIR" ]]; then
         log "Проект уже существует в $PROJECT_DIR"
         read -p "Хотите обновить проект? (y/n): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             log "Обновление проекта..."
             cd "$PROJECT_DIR"
-            git pull origin main || git pull origin master
+            git pull origin main || git pull origin master || log "Не удалось обновить из git"
         fi
     else
         log "Клонирование проекта..."
-        read -p "Введите URL репозитория: " REPO_URL
-        git clone "$REPO_URL" "$PROJECT_DIR"
+        read -p "Введите URL репозитория (или нажмите Enter для пропуска): " REPO_URL
+        if [[ -n "$REPO_URL" ]]; then
+            git clone "$REPO_URL" "$PROJECT_DIR"
+        else
+            log "Создание структуры проекта..."
+            mkdir -p "$PROJECT_DIR"
+        fi
     fi
     
     cd "$PROJECT_DIR"
     
     # Создание директорий
     log "Создание необходимых директорий..."
-    mkdir -p uploads data logs
+    mkdir -p uploads data logs server
     
-    # Установка зависимостей
-    log "Установка зависимостей frontend..."
-    npm install
+    # Установка зависимостей (если есть package.json)
+    if [[ -f "package.json" ]]; then
+        log "Установка зависимостей frontend..."
+        npm install
+    fi
     
-    log "Установка зависимостей backend..."
-    cd server
-    npm install
-    cd ..
+    if [[ -f "server/package.json" ]]; then
+        log "Установка зависимостей backend..."
+        cd server
+        npm install
+        cd ..
+    fi
 }
 
 # Настройка конфигурации
@@ -423,7 +452,7 @@ main() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
-    check_sudo
+    check_permissions
     update_system
     install_nodejs
     install_redis
