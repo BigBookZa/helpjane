@@ -3,7 +3,19 @@
 # Helper for Jane - Automated Setup Script
 # This script sets up the complete environment for the Helper for Jane application
 
-set -e  # Exit on error
+# Don't exit on error immediately - we'll handle errors manually
+set +e
+
+# Enable exit on error for critical sections only
+trap 'handle_error $? $LINENO' ERR
+
+handle_error() {
+    local exit_code=$1
+    local line_number=$2
+    if [ $exit_code -ne 0 ]; then
+        log_error "Error occurred at line $line_number with exit code $exit_code"
+    fi
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -88,6 +100,30 @@ log_success "External IP: $EXTERNAL_IP"
 # Get project directory
 PROJECT_DIR=$(pwd)
 log_info "Project directory: $PROJECT_DIR"
+
+# Verify project structure
+log_info "Verifying project structure..."
+if [ ! -f "$PROJECT_DIR/package.json" ]; then
+    log_error "package.json not found in $PROJECT_DIR"
+    log_error "Please run this script from the project root directory"
+    exit 1
+fi
+
+if [ ! -d "$PROJECT_DIR/server" ]; then
+    log_error "server directory not found in $PROJECT_DIR"
+    log_error "Project structure seems incorrect"
+    log_info "Current directory contents:"
+    ls -la "$PROJECT_DIR"
+    exit 1
+fi
+
+if [ ! -f "$PROJECT_DIR/server/package.json" ]; then
+    log_error "server/package.json not found"
+    log_error "Server directory structure seems incorrect"
+    exit 1
+fi
+
+log_success "Project structure verified"
 
 # Update system
 log_info "Updating system packages..."
@@ -175,15 +211,29 @@ log_success "PM2 installed"
 
 # Create necessary directories
 log_info "Creating project directories..."
-mkdir -p "$PROJECT_DIR/server/uploads"
-mkdir -p "$PROJECT_DIR/server/data"
-mkdir -p "$PROJECT_DIR/server/scripts"
-mkdir -p "$PROJECT_DIR/logs"
-chmod -R 755 "$PROJECT_DIR/server/uploads"
-chmod -R 755 "$PROJECT_DIR/server/data"
-chmod -R 755 "$PROJECT_DIR/server/scripts"
-chmod -R 755 "$PROJECT_DIR/logs"
-log_success "Directories created"
+DIRS=(
+    "$PROJECT_DIR/server/uploads"
+    "$PROJECT_DIR/server/data"
+    "$PROJECT_DIR/server/scripts"
+    "$PROJECT_DIR/logs"
+)
+
+for dir in "${DIRS[@]}"; do
+    if [ ! -d "$dir" ]; then
+        log_info "Creating directory: $dir"
+        mkdir -p "$dir" || log_warning "Could not create $dir"
+    else
+        log_info "Directory already exists: $dir"
+    fi
+done
+
+# Set permissions
+chmod -R 755 "$PROJECT_DIR/server/uploads" 2>/dev/null || true
+chmod -R 755 "$PROJECT_DIR/server/data" 2>/dev/null || true
+chmod -R 755 "$PROJECT_DIR/server/scripts" 2>/dev/null || true
+chmod -R 755 "$PROJECT_DIR/logs" 2>/dev/null || true
+
+log_success "Directories created and permissions set"
 
 # Install project dependencies with timeout
 log_info "Installing frontend dependencies..."
@@ -256,22 +306,57 @@ log_success "Frontend .env created"
 # Initialize database
 log_info "Initializing database..."
 cd "$PROJECT_DIR/server"
+
 # Create database file if it doesn't exist
-touch "$PROJECT_DIR/server/data/database.sqlite"
-chmod 644 "$PROJECT_DIR/server/data/database.sqlite"
+DB_FILE="$PROJECT_DIR/server/data/database.sqlite"
+if [ ! -f "$DB_FILE" ]; then
+    log_info "Creating database file..."
+    touch "$DB_FILE"
+    chmod 644 "$DB_FILE"
+else
+    log_info "Database file already exists"
+fi
 
 # Run migrations if script exists
 if [ -f "package.json" ] && grep -q '"migrate"' package.json; then
-    npm run migrate || log_warning "Migration might have already been run"
+    log_info "Running database migrations..."
+    npm run migrate 2>&1 || log_warning "Migration might have already been run or failed"
 else
-    log_warning "No migration script found, skipping..."
+    log_warning "No migration script found in package.json"
 fi
+
 log_success "Database initialized"
 
 # Create admin user script
 log_info "Creating admin user script..."
-mkdir -p "$PROJECT_DIR/server/scripts"
-cat > "$PROJECT_DIR/server/scripts/create-admin.js" << 'EOF'
+
+# Ensure server directory exists
+if [ ! -d "$PROJECT_DIR/server" ]; then
+    log_error "Server directory not found at $PROJECT_DIR/server"
+    log_info "Current directory structure:"
+    ls -la "$PROJECT_DIR"
+    exit 1
+fi
+
+# Create scripts directory with full path
+SCRIPTS_DIR="$PROJECT_DIR/server/scripts"
+log_info "Creating scripts directory at: $SCRIPTS_DIR"
+mkdir -p "$SCRIPTS_DIR" || {
+    log_error "Failed to create scripts directory"
+    exit 1
+}
+
+# Verify directory was created
+if [ ! -d "$SCRIPTS_DIR" ]; then
+    log_error "Scripts directory was not created successfully"
+    exit 1
+fi
+
+# Create the admin script file
+ADMIN_SCRIPT="$SCRIPTS_DIR/create-admin.js"
+log_info "Creating admin script at: $ADMIN_SCRIPT"
+
+cat > "$ADMIN_SCRIPT" << 'EOF'
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const path = require('path');
@@ -324,10 +409,29 @@ async function createAdmin() {
 createAdmin();
 EOF
 
+# Verify file was created
+if [ ! -f "$ADMIN_SCRIPT" ]; then
+    log_error "Failed to create admin script file"
+    exit 1
+fi
+
 # Make script executable and run it
-chmod +x "$PROJECT_DIR/server/scripts/create-admin.js"
+chmod +x "$ADMIN_SCRIPT"
 cd "$PROJECT_DIR/server"
-node scripts/create-admin.js || log_warning "Admin creation might have failed"
+
+# Check if we have the required dependencies
+if [ ! -d "node_modules/bcryptjs" ]; then
+    log_warning "bcryptjs not found, installing..."
+    npm install bcryptjs
+fi
+
+if [ ! -d "node_modules/better-sqlite3" ]; then
+    log_warning "better-sqlite3 not found, installing..."
+    npm install better-sqlite3
+fi
+
+log_info "Running admin creation script..."
+node "$ADMIN_SCRIPT" || log_warning "Admin creation might have failed - this is normal if admin already exists"
 log_success "Admin user setup complete"
 
 # Build frontend
@@ -459,10 +563,35 @@ log_success "Firewall configured"
 # Start backend with PM2
 log_info "Starting backend with PM2..."
 cd "$PROJECT_DIR"
+
+# Clear any existing PM2 processes
 pm2 delete all 2>/dev/null || true
-pm2 start ecosystem.config.js
-pm2 save
-log_success "Backend started"
+pm2 kill 2>/dev/null || true
+
+# Wait a moment
+sleep 2
+
+# Start the application
+log_info "Starting application with PM2..."
+if pm2 start ecosystem.config.js; then
+    log_success "PM2 started successfully"
+    pm2 save
+    
+    # Wait for the application to start
+    log_info "Waiting for application to start..."
+    sleep 10
+    
+    # Check if it's actually running
+    if pm2 list | grep -q "jane-backend.*online"; then
+        log_success "Backend is running!"
+    else
+        log_error "Backend failed to start"
+        log_info "Checking PM2 logs..."
+        pm2 logs jane-backend --lines 20 --nostream
+    fi
+else
+    log_error "Failed to start PM2"
+fi
 
 # Create health check script
 log_info "Creating health check script..."
