@@ -29,6 +29,44 @@ log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Timeout function for npm install
+run_with_timeout() {
+    local timeout=$1
+    shift
+    local command="$@"
+    
+    log_info "Running with ${timeout}s timeout: $command"
+    
+    # Run command in background
+    $command &
+    local pid=$!
+    
+    # Wait for command or timeout
+    local count=0
+    while kill -0 $pid 2>/dev/null && [ $count -lt $timeout ]; do
+        sleep 1
+        ((count++))
+        
+        # Show progress every 10 seconds
+        if [ $((count % 10)) -eq 0 ]; then
+            echo -ne "\r${BLUE}[INFO]${NC} Still running... ${count}s elapsed"
+        fi
+    done
+    echo ""
+    
+    # Check if process is still running
+    if kill -0 $pid 2>/dev/null; then
+        log_warning "Command timed out after ${timeout}s, terminating..."
+        kill -TERM $pid
+        sleep 2
+        kill -9 $pid 2>/dev/null || true
+        return 1
+    else
+        wait $pid
+        return $?
+    fi
+}
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    log_error "This script must be run as root"
@@ -53,6 +91,7 @@ log_info "Project directory: $PROJECT_DIR"
 
 # Update system
 log_info "Updating system packages..."
+export DEBIAN_FRONTEND=noninteractive
 apt-get update -y && apt-get upgrade -y
 log_success "System updated"
 
@@ -73,7 +112,8 @@ apt-get install -y \
     ufw \
     sqlite3 \
     python3 \
-    python3-pip
+    python3-pip \
+    libvips-dev
 log_success "Essential tools installed"
 
 # Install Node.js 20.x (LTS)
@@ -82,12 +122,43 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 log_success "Node.js $(node --version) installed"
 
+# Update npm to latest version
+log_info "Updating npm..."
+npm install -g npm@latest
+log_success "npm $(npm --version) installed"
+
 # Install Redis
 log_info "Installing Redis..."
 apt-get install -y redis-server
+# Configure Redis for production
+cat > /etc/redis/redis.conf << EOF
+bind 127.0.0.1
+protected-mode yes
+port 6379
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+daemonize yes
+supervised systemd
+pidfile /var/run/redis/redis-server.pid
+loglevel notice
+logfile /var/log/redis/redis-server.log
+databases 16
+always-show-logo no
+save 900 1
+save 300 10
+save 60 10000
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+dbfilename dump.rdb
+dir /var/lib/redis
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+EOF
 systemctl enable redis-server
-systemctl start redis-server
-log_success "Redis installed and started"
+systemctl restart redis-server
+log_success "Redis installed and configured"
 
 # Install Nginx
 log_info "Installing Nginx..."
@@ -95,30 +166,44 @@ apt-get install -y nginx
 systemctl enable nginx
 log_success "Nginx installed"
 
-# Install PM2
+# Install PM2 globally
 log_info "Installing PM2..."
 npm install -g pm2
 pm2 startup systemd -u root --hp /root
 systemctl enable pm2-root
 log_success "PM2 installed"
 
-# Create uploads directory
-log_info "Creating uploads directory..."
+# Create necessary directories
+log_info "Creating project directories..."
 mkdir -p "$PROJECT_DIR/server/uploads"
 mkdir -p "$PROJECT_DIR/server/data"
-chmod 755 "$PROJECT_DIR/server/uploads"
-chmod 755 "$PROJECT_DIR/server/data"
+mkdir -p "$PROJECT_DIR/server/scripts"
+mkdir -p "$PROJECT_DIR/logs"
+chmod -R 755 "$PROJECT_DIR/server/uploads"
+chmod -R 755 "$PROJECT_DIR/server/data"
+chmod -R 755 "$PROJECT_DIR/server/scripts"
+chmod -R 755 "$PROJECT_DIR/logs"
 log_success "Directories created"
 
-# Install project dependencies
+# Install project dependencies with timeout
 log_info "Installing frontend dependencies..."
 cd "$PROJECT_DIR"
-npm install
+if ! run_with_timeout 300 npm install; then
+    log_warning "npm install timed out or failed, forcing cleanup and retry..."
+    rm -rf node_modules package-lock.json
+    npm cache clean --force
+    npm install --no-audit --no-fund
+fi
 log_success "Frontend dependencies installed"
 
 log_info "Installing backend dependencies..."
 cd "$PROJECT_DIR/server"
-npm install
+if ! run_with_timeout 300 npm install; then
+    log_warning "npm install timed out or failed, forcing cleanup and retry..."
+    rm -rf node_modules package-lock.json
+    npm cache clean --force
+    npm install --no-audit --no-fund
+fi
 log_success "Backend dependencies installed"
 
 # Generate JWT secret
@@ -171,11 +256,21 @@ log_success "Frontend .env created"
 # Initialize database
 log_info "Initializing database..."
 cd "$PROJECT_DIR/server"
-npm run migrate || log_warning "Migration might have already been run"
+# Create database file if it doesn't exist
+touch "$PROJECT_DIR/server/data/database.sqlite"
+chmod 644 "$PROJECT_DIR/server/data/database.sqlite"
+
+# Run migrations if script exists
+if [ -f "package.json" ] && grep -q '"migrate"' package.json; then
+    npm run migrate || log_warning "Migration might have already been run"
+else
+    log_warning "No migration script found, skipping..."
+fi
 log_success "Database initialized"
 
 # Create admin user script
-log_info "Creating admin user..."
+log_info "Creating admin user script..."
+mkdir -p "$PROJECT_DIR/server/scripts"
 cat > "$PROJECT_DIR/server/scripts/create-admin.js" << 'EOF'
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
@@ -186,6 +281,19 @@ const db = new Database(dbPath);
 
 async function createAdmin() {
   try {
+    // Create users table if not exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
     const existingAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@example.com');
     
     if (existingAdmin) {
@@ -203,6 +311,8 @@ async function createAdmin() {
     stmt.run('Administrator', 'admin@example.com', hashedPassword, 'admin');
     
     console.log('Admin user created successfully!');
+    console.log('Email: admin@example.com');
+    console.log('Password: admin123');
     
   } catch (error) {
     console.error('Error creating admin user:', error);
@@ -214,20 +324,35 @@ async function createAdmin() {
 createAdmin();
 EOF
 
-mkdir -p "$PROJECT_DIR/server/scripts"
-node "$PROJECT_DIR/server/scripts/create-admin.js" || log_warning "Admin creation might have failed"
+# Make script executable and run it
+chmod +x "$PROJECT_DIR/server/scripts/create-admin.js"
+cd "$PROJECT_DIR/server"
+node scripts/create-admin.js || log_warning "Admin creation might have failed"
 log_success "Admin user setup complete"
 
 # Build frontend
 log_info "Building frontend..."
 cd "$PROJECT_DIR"
-npm run build
+NODE_OPTIONS="--max-old-space-size=4096" npm run build || {
+    log_error "Frontend build failed"
+    exit 1
+}
 log_success "Frontend built"
 
-# Add health check endpoint if not exists
-log_info "Ensuring health check endpoint exists..."
-if ! grep -q "/api/health" "$PROJECT_DIR/server/src/index.js" 2>/dev/null; then
-    cat >> "$PROJECT_DIR/server/src/index.js" << 'EOF'
+# Add health check endpoint to server if needed
+log_info "Checking for health endpoint..."
+SERVER_FILE="$PROJECT_DIR/server/src/index.js"
+if [ ! -f "$SERVER_FILE" ]; then
+    SERVER_FILE="$PROJECT_DIR/server/index.js"
+fi
+
+if [ -f "$SERVER_FILE" ] && ! grep -q "/api/health" "$SERVER_FILE" 2>/dev/null; then
+    log_info "Adding health check endpoint..."
+    # Create a backup
+    cp "$SERVER_FILE" "$SERVER_FILE.backup"
+    
+    # Add health endpoint before the last module.exports or at the end
+    cat >> "$SERVER_FILE" << 'EOF'
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -240,38 +365,40 @@ app.get('/api/health', (req, res) => {
 });
 EOF
     log_success "Health check endpoint added"
-else
-    log_info "Health check endpoint already exists"
 fi
 
 # Create PM2 ecosystem file
 log_info "Creating PM2 configuration..."
-cat > "$PROJECT_DIR/ecosystem.config.js" << 'EOF'
+cat > "$PROJECT_DIR/ecosystem.config.js" << EOF
 module.exports = {
   apps: [
     {
       name: 'jane-backend',
       script: './server/src/index.js',
-      cwd: './',
+      cwd: '$PROJECT_DIR',
       instances: 1,
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        PORT: 3001
       },
-      error_file: './logs/backend-error.log',
-      out_file: './logs/backend-out.log',
-      log_file: './logs/backend-combined.log',
+      error_file: '$PROJECT_DIR/logs/backend-error.log',
+      out_file: '$PROJECT_DIR/logs/backend-out.log',
+      log_file: '$PROJECT_DIR/logs/backend-combined.log',
       time: true
     }
   ]
 };
 EOF
 
-# Create logs directory
-mkdir -p "$PROJECT_DIR/logs"
-chmod 755 "$PROJECT_DIR/logs"
+# If src/index.js doesn't exist, try index.js
+if [ ! -f "$PROJECT_DIR/server/src/index.js" ] && [ -f "$PROJECT_DIR/server/index.js" ]; then
+    sed -i "s|./server/src/index.js|./server/index.js|g" "$PROJECT_DIR/ecosystem.config.js"
+fi
+
+log_success "PM2 configuration created"
 
 # Configure Nginx
 log_info "Configuring Nginx..."
@@ -316,8 +443,7 @@ EOF
 # Enable Nginx site
 ln -sf /etc/nginx/sites-available/helper-for-jane /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
-nginx -t
-systemctl restart nginx
+nginx -t && systemctl restart nginx
 log_success "Nginx configured"
 
 # Configure UFW firewall
@@ -333,6 +459,7 @@ log_success "Firewall configured"
 # Start backend with PM2
 log_info "Starting backend with PM2..."
 cd "$PROJECT_DIR"
+pm2 delete all 2>/dev/null || true
 pm2 start ecosystem.config.js
 pm2 save
 log_success "Backend started"
@@ -372,7 +499,7 @@ echo ""
 echo "Port Status:"
 # Check ports
 for port in 80 3001 6379; do
-    if netstat -tuln | grep -q ":$port "; then
+    if ss -tlnp | grep -q ":$port "; then
         echo "Port $port: ✓ Open"
     else
         echo "Port $port: ✗ Closed"
@@ -440,86 +567,55 @@ EOF
 
 chmod +x "$PROJECT_DIR/manage.sh"
 
-# Wait for services to start
-log_info "Waiting for services to start..."
+# Create quick fix script
+log_info "Creating quick fix script..."
+cat > "$PROJECT_DIR/quick_fix.sh" << 'EOF'
+#!/bin/bash
+
+echo "=== Quick Fix for Helper for Jane ==="
+echo "Attempting to resolve ERR_EMPTY_RESPONSE..."
+echo ""
+
+# Step 1: Kill all related processes
+echo "Step 1: Stopping all services..."
+pm2 kill
+systemctl stop nginx
+systemctl stop redis-server
+killall node 2>/dev/null || true
+
+# Step 2: Clear potential locks and temp files
+echo "Step 2: Clearing locks and temp files..."
+rm -f /var/run/redis/redis-server.pid
+rm -f /var/lib/redis/dump.rdb.temp.*
+
+# Step 3: Start services in correct order
+echo "Step 3: Starting Redis..."
+systemctl start redis-server
+sleep 2
+
+# Verify Redis is running
+if ! redis-cli ping > /dev/null 2>&1; then
+    echo "ERROR: Redis failed to start!"
+    journalctl -u redis-server -n 20
+    exit 1
+fi
+
+echo "Step 4: Starting Nginx..."
+nginx -t && systemctl start nginx
+sleep 1
+
+echo "Step 5: Starting PM2..."
+cd "$(dirname "$0")"
+pm2 start ecosystem.config.js
 sleep 5
 
-# Run health check
-log_info "Running health check..."
-"$PROJECT_DIR/health_check.sh"
-
-# Troubleshooting common issues
-log_info "Checking for common issues..."
-
-# Check if backend is actually running
-if ! pm2 list | grep -q "jane-backend.*online"; then
-    log_warning "Backend not running, attempting to start..."
-    cd "$PROJECT_DIR"
-    pm2 delete all 2>/dev/null || true
-    pm2 start ecosystem.config.js
-    sleep 5
-fi
-
-# Check Redis connection
-if ! redis-cli ping > /dev/null 2>&1; then
-    log_warning "Redis not responding, restarting..."
-    systemctl restart redis-server
-    sleep 2
-fi
-
-# Check Nginx configuration
-if ! nginx -t > /dev/null 2>&1; then
-    log_error "Nginx configuration error!"
-    nginx -t
-fi
-
-# Test backend directly
-if ! curl -s -f http://localhost:3001/api/health > /dev/null 2>&1; then
-    log_warning "Backend not responding, checking logs..."
-    pm2 logs jane-backend --lines 20 --nostream
-    
-    # Common fixes
-    log_info "Attempting common fixes..."
-    
-    # Fix permissions
-    chown -R root:root "$PROJECT_DIR/server/data"
-    chmod -R 755 "$PROJECT_DIR/server/data"
-    chown -R root:root "$PROJECT_DIR/server/uploads"
-    chmod -R 755 "$PROJECT_DIR/server/uploads"
-    
-    # Restart backend
-    pm2 restart jane-backend
-    sleep 5
-    
-    # Check again
-    if ! curl -s -f http://localhost:3001/api/health > /dev/null 2>&1; then
-        log_error "Backend still not responding. Check logs with: pm2 logs jane-backend"
-    else
-        log_success "Backend is now responding"
-    fi
-fi
-
-# Create API keys reminder
-cat > "$PROJECT_DIR/API_KEYS_REQUIRED.txt" << EOF
-=== API Keys Required ===
-
-To fully enable the application, you need to add the following API keys to server/.env:
-
-1. OPENAI_API_KEY - Required for AI image analysis
-   Get it from: https://platform.openai.com/api-keys
-
-2. TELEGRAM_BOT_TOKEN - Optional, for notifications
-   Get it from: https://t.me/BotFather
-
-3. TELEGRAM_CHAT_ID - Optional, your Telegram chat ID
-   Get it by messaging your bot and checking: https://api.telegram.org/bot<YourBOTToken>/getUpdates
-
-4. YANDEX_DISK_TOKEN - Optional, for cloud storage
-   Get it from: https://oauth.yandex.ru/
-
-After adding the keys, restart the backend:
-./manage.sh restart
+# Step 6: Verify everything is working
+echo ""
+echo "Step 6: Verifying services..."
+./health_check.sh
 EOF
+
+chmod +x "$PROJECT_DIR/quick_fix.sh"
 
 # Create troubleshooting script
 log_info "Creating troubleshooting script..."
@@ -558,16 +654,70 @@ echo "=== Nginx Error Log (last 10 lines) ==="
 tail -n 10 /var/log/nginx/error.log
 
 echo ""
-echo "5. Common fixes to try:"
-echo "- Restart all services: systemctl restart redis-server nginx && pm2 restart all"
+echo "5. Environment check:"
+echo "Node version: $(node --version)"
+echo "NPM version: $(npm --version)"
+echo "PM2 version: $(pm2 --version)"
+echo ""
+
+echo "6. Common fixes to try:"
+echo "- Restart all: ./quick_fix.sh"
 echo "- Check disk space: df -h"
 echo "- Check memory: free -h"
-echo "- Reset PM2: pm2 delete all && cd $(pwd) && pm2 start ecosystem.config.js"
-echo "- Check firewall: ufw status"
-echo "- Test backend directly: curl http://localhost:3001/api/health"
+echo "- View full logs: pm2 logs jane-backend"
 EOF
 
 chmod +x "$PROJECT_DIR/troubleshoot.sh"
+
+# Wait for services to start
+log_info "Waiting for services to start..."
+sleep 10
+
+# Run initial troubleshooting
+log_info "Checking for common issues..."
+
+# Check if backend is actually running
+if ! pm2 list | grep -q "jane-backend.*online"; then
+    log_warning "Backend not running, attempting to diagnose..."
+    
+    # Check if the entry point exists
+    if [ ! -f "$PROJECT_DIR/server/src/index.js" ] && [ ! -f "$PROJECT_DIR/server/index.js" ]; then
+        log_error "Cannot find server entry point (index.js)"
+        log_info "Please check your server structure"
+    else
+        log_info "Attempting to start backend again..."
+        cd "$PROJECT_DIR"
+        pm2 delete all 2>/dev/null || true
+        pm2 start ecosystem.config.js
+        sleep 5
+    fi
+fi
+
+# Final health check
+log_info "Running final health check..."
+"$PROJECT_DIR/health_check.sh"
+
+# Create API keys reminder
+cat > "$PROJECT_DIR/API_KEYS_REQUIRED.txt" << EOF
+=== API Keys Required ===
+
+To fully enable the application, you need to add the following API keys to server/.env:
+
+1. OPENAI_API_KEY - Required for AI image analysis
+   Get it from: https://platform.openai.com/api-keys
+
+2. TELEGRAM_BOT_TOKEN - Optional, for notifications
+   Get it from: https://t.me/BotFather
+
+3. TELEGRAM_CHAT_ID - Optional, your Telegram chat ID
+   Get it by messaging your bot and checking: https://api.telegram.org/bot<YourBOTToken>/getUpdates
+
+4. YANDEX_DISK_TOKEN - Optional, for cloud storage
+   Get it from: https://oauth.yandex.ru/
+
+After adding the keys, restart the backend:
+./manage.sh restart
+EOF
 
 # Final summary
 echo ""
@@ -587,6 +737,7 @@ echo "- View logs: ./manage.sh logs"
 echo "- Check status: ./manage.sh status"
 echo "- Health check: ./manage.sh health"
 echo "- Troubleshoot: ./troubleshoot.sh"
+echo "- Quick fix: ./quick_fix.sh"
 echo ""
 echo "PM2 commands:"
 echo "- pm2 status"
@@ -600,7 +751,9 @@ echo "Default login credentials:"
 echo "Email: admin@example.com"
 echo "Password: admin123"
 echo ""
-echo "If you encounter ERR_EMPTY_RESPONSE, run:"
-echo "./troubleshoot.sh"
+echo "If backend is not running, check:"
+echo "1. pm2 logs jane-backend"
+echo "2. Verify server entry point exists"
+echo "3. Run ./troubleshoot.sh"
 echo ""
 echo "========================================"
