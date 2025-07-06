@@ -2,10 +2,34 @@ import { Request, Response } from 'express';
 import { SettingsModel } from '../models/Settings';
 import { ActivityLogger } from '../utils/activityLogger';
 
+// Определяем интерфейс для настроек
+interface Settings {
+  openai_api_key?: string;
+  telegram_bot_token?: string;
+  yandex_disk_token?: string;
+  max_tokens?: number;
+  temperature?: number;
+  [key: string]: any;
+}
+
+// Интерфейс для безопасных настроек (без чувствительных данных)
+interface SafeSettings extends Settings {
+  // Все свойства опциональны
+}
+
+// Интерфейс для ошибок API
+interface ApiError {
+  error?: {
+    message: string;
+  };
+  description?: string;
+  message?: string;
+}
+
 export const getSettings = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    let settings = {};
+    let settings: Settings = {};
     
     try {
       settings = SettingsModel.getUserSettings(userId);
@@ -15,7 +39,7 @@ export const getSettings = async (req: Request, res: Response) => {
     }
     
     // Don't send sensitive data to frontend
-    const safeSettings = { ...settings };
+    const safeSettings: SafeSettings = { ...settings };
     if (safeSettings.openai_api_key) {
       safeSettings.openai_api_key = '***' + safeSettings.openai_api_key.slice(-4);
     }
@@ -31,7 +55,7 @@ export const getSettings = async (req: Request, res: Response) => {
     console.error('Get settings error:', error);
     res.status(500).json({ 
       error: 'Failed to fetch settings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };
@@ -39,7 +63,7 @@ export const getSettings = async (req: Request, res: Response) => {
 export const updateSettings = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const updates = req.body;
+    const updates: Settings = req.body;
 
     // Validate critical settings
     if (updates.openai_api_key && !updates.openai_api_key.startsWith('sk-')) {
@@ -72,8 +96,8 @@ export const updateSettings = async (req: Request, res: Response) => {
     }
 
     // Return updated settings (masked)
-    const settings = SettingsModel.getUserSettings(userId);
-    const safeSettings = { ...settings };
+    const settings: Settings = SettingsModel.getUserSettings(userId);
+    const safeSettings: SafeSettings = { ...settings };
     if (safeSettings.openai_api_key) {
       safeSettings.openai_api_key = '***' + safeSettings.openai_api_key.slice(-4);
     }
@@ -86,7 +110,7 @@ export const updateSettings = async (req: Request, res: Response) => {
     console.error('Update settings error:', error);
     res.status(500).json({ 
       error: 'Failed to update settings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };
@@ -128,7 +152,7 @@ export const testApiConnection = async (req: Request, res: Response) => {
     console.error('API test error:', error);
     res.status(500).json({ 
       error: 'Failed to test API connection',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };
@@ -145,7 +169,7 @@ const testOpenAIConnection = async (apiKey: string) => {
     if (response.ok) {
       return { success: true, message: 'OpenAI API connection successful' };
     } else {
-      const error = await response.json();
+      const error = await response.json() as ApiError;
       return { success: false, message: error.error?.message || 'Invalid API key' };
     }
   } catch (error) {
@@ -167,7 +191,7 @@ const testTelegramConnection = async (token: string, chatId: string) => {
     if (response.ok) {
       return { success: true, message: 'Telegram bot connection successful' };
     } else {
-      const error = await response.json();
+      const error = await response.json() as ApiError;
       return { success: false, message: error.description || 'Invalid bot token or chat ID' };
     }
   } catch (error) {
@@ -197,10 +221,10 @@ const testYandexConnection = async (token: string) => {
 export const exportSettings = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const settings = SettingsModel.getUserSettings(userId);
+    const settings: Settings = SettingsModel.getUserSettings(userId);
 
     // Remove sensitive data from export
-    const exportData = { ...settings };
+    const exportData: Settings = { ...settings };
     delete exportData.openai_api_key;
     delete exportData.telegram_bot_token;
     delete exportData.yandex_disk_token;
@@ -218,7 +242,7 @@ export const exportSettings = async (req: Request, res: Response) => {
     console.error('Export settings error:', error);
     res.status(500).json({ 
       error: 'Failed to export settings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };
@@ -244,7 +268,7 @@ export const importSettings = async (req: Request, res: Response) => {
     console.error('Import settings error:', error);
     res.status(500).json({ 
       error: 'Failed to import settings',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
     });
   }
 };
