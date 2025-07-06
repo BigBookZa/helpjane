@@ -733,7 +733,7 @@ echo "Step 4: Starting Nginx..."
 nginx -t && systemctl start nginx
 sleep 1
 
-echo "Step 5: Starting PM2..."
+echo "Step №5: Starting PM2..."
 cd "$(dirname "$0")"
 pm2 start ecosystem.config.js
 sleep 5
