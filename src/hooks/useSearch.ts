@@ -164,7 +164,7 @@ export const useSearch = (files: FileData[]): SearchHook => {
         ].filter(Boolean);
 
         const matchesText = searchFields.some(field =>
-          field.toLowerCase().includes(cleanTerm.toLowerCase())
+          typeof field === 'string' && field.toLowerCase().includes(cleanTerm.toLowerCase())
         );
 
         if (!matchesText) return false;
