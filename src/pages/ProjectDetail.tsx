@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   ArrowLeft,
@@ -33,7 +33,15 @@ const ProjectDetail: React.FC = () => {
   const { id } = useParams();
   const projectId = parseInt(id || '0');
   
-  const files = useStore((state) => state.files.filter(f => f.projectId === projectId));
+const files = useStore((state) => state.files.filter(f => f.projectId === projectId));
+const loadProjectFiles = useStore((state) => state.loadProjectFiles);
+
+// Добавляем useEffect для загрузки файлов
+useEffect(() => {
+  if (projectId) {
+    loadProjectFiles(projectId);
+  }
+}, [projectId, loadProjectFiles]);
   const projects = useStore((state) => state.projects);
   const selectedFiles = useStore((state) => state.selectedFiles);
   const setSelectedFiles = useStore((state) => state.setSelectedFiles);

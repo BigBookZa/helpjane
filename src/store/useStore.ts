@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getDashboardData, getProjects, getSettings } from '../services/api';
+import { getDashboardData, getProjects, getSettings, getProjectFiles} from '../services/api';
 
 export interface Project {
   id: number;
@@ -141,8 +141,10 @@ interface AppState {
   error: string | null;
   
   // Actions
+
   loadDashboardData: () => Promise<void>;
   loadProjects: () => Promise<void>;
+  loadProjectFiles: (projectId: number) => Promise<void>;  // <-- добавьте эту строку
   loadSettings: () => Promise<void>;
   
   addProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => void;
@@ -249,7 +251,49 @@ export const useStore = create<AppState>()(
           console.error('Failed to load settings:', error);
         }
       },
-      
+      loadProjectFiles: async (projectId: number) => {
+        try {
+          set({ isLoading: true, error: null });
+          const apiFiles = await getProjectFiles(projectId);
+          
+          // Преобразуем данные из API в формат UI
+          const files = apiFiles.map((file: any) => ({
+            id: file.id,
+            projectId: file.project_id,
+            filename: file.filename,
+            newNamePhoto: file.new_name_photo || '',
+            titleAdobe: file.title_adobe || '',
+            size: (file.file_size / (1024 * 1024)).toFixed(2) + ' MB',
+            uploaded: file.created_at,
+            status: file.status,
+            description: file.description || '',
+            keywords: file.keywords || [],
+            prompt: file.prompt || '',
+            keysAdobe: file.keys_adobe || [],
+            adobeCategory: file.adobe_category || '',
+            attempts: file.attempts || 0,
+            processingTime: file.processing_time || '',
+            thumbnail: file.thumbnail || '',
+            notes: file.notes || '',
+            error: file.error_message || '',
+            tags: file.tags || []
+          }));
+          
+          // Заменяем файлы для этого проекта
+          set((state) => ({
+            files: [
+              ...state.files.filter(f => f.projectId !== projectId),
+              ...files
+            ],
+            isLoading: false
+          }));
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.error || 'Failed to load project files',
+            isLoading: false
+          });
+        }
+      },
       // Project actions
       addProject: (projectData) => {
         const newProject: Project = {
