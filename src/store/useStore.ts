@@ -16,6 +16,11 @@ export interface Project {
   processed_count: number;
   error_count: number;
   status: 'active' | 'processing' | 'completed' | 'error' | 'paused';
+  // UI поля (добавленные через маппинг)
+  filesCount?: number;
+  processed?: number;
+  errors?: number;
+  updated?: string;
 }
 
 export interface FileData {
