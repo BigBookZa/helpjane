@@ -123,9 +123,7 @@ const ProjectDetail: React.FC = () => {
     adobeCategory: '',
     attempts: 0,
     processingTime: '',
-    thumbnail: file instanceof File
-      ? URL.createObjectURL(file)
-      : (file.thumbnailUrl || ''), // <-- если сервер отдаёт ссылку, иначе пусть будет пусто
+    thumbnail: file.url || '', // ПУТЬ С СЕРВЕРА // <-- если сервер отдаёт ссылку, иначе пусть будет пусто
     notes: '',
     tags: []
   }));
