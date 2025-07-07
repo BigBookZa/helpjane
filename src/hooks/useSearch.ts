@@ -79,60 +79,61 @@ export const useSearch = (files: FileData[]): SearchHook => {
     const suggestions = new Map<string, { type: string; count: number }>();
 
     files.forEach(file => {
-      // Filenames
-      if (file.filename.toLowerCase().includes(searchTerm.toLowerCase())) {
-        const key = `filename:${file.filename}`;
-        suggestions.set(key, { 
-          type: 'filename', 
-          count: (suggestions.get(key)?.count || 0) + 1 
-        });
-      }
-
-      // Tags
-      file.tags.forEach(tag => {
-        if (tag.toLowerCase().includes(searchTerm.toLowerCase())) {
-          const key = `tag:${tag}`;
-          suggestions.set(key, { 
-            type: 'tag', 
-            count: (suggestions.get(key)?.count || 0) + 1 
-          });
-        }
-      });
-
-      // Keywords
-      file.keywords.forEach(keyword => {
-        if (keyword.toLowerCase().includes(searchTerm.toLowerCase())) {
-          const key = `keyword:${keyword}`;
-          suggestions.set(key, { 
-            type: 'keyword', 
-            count: (suggestions.get(key)?.count || 0) + 1 
-          });
-        }
-      });
-
-      // Adobe categories
-      if (file.adobeCategory && file.adobeCategory.toLowerCase().includes(searchTerm.toLowerCase())) {
-        const key = `category:${file.adobeCategory}`;
-        suggestions.set(key, { 
-          type: 'category', 
-          count: (suggestions.get(key)?.count || 0) + 1 
-        });
-      }
-
-      // Descriptions
-      if (file.description && file.description.toLowerCase().includes(searchTerm.toLowerCase())) {
-        const words = file.description.split(' ').filter(word => 
-          word.length > 3 && word.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        words.forEach(word => {
-          const key = `description:${word}`;
-          suggestions.set(key, { 
-            type: 'description', 
-            count: (suggestions.get(key)?.count || 0) + 1 
-          });
-        });
-      }
+  // Filenames
+  if (typeof file.filename === 'string' && file.filename.toLowerCase().includes(searchTerm.toLowerCase())) {
+    const key = `filename:${file.filename}`;
+    suggestions.set(key, { 
+      type: 'filename', 
+      count: (suggestions.get(key)?.count || 0) + 1 
     });
+  }
+
+  // Tags
+  (file.tags || []).forEach(tag => {
+    if (typeof tag === 'string' && tag.toLowerCase().includes(searchTerm.toLowerCase())) {
+      const key = `tag:${tag}`;
+      suggestions.set(key, { 
+        type: 'tag', 
+        count: (suggestions.get(key)?.count || 0) + 1 
+      });
+    }
+  });
+
+  // Keywords
+  (file.keywords || []).forEach(keyword => {
+    if (typeof keyword === 'string' && keyword.toLowerCase().includes(searchTerm.toLowerCase())) {
+      const key = `keyword:${keyword}`;
+      suggestions.set(key, { 
+        type: 'keyword', 
+        count: (suggestions.get(key)?.count || 0) + 1 
+      });
+    }
+  });
+
+  // Adobe categories
+  if (typeof file.adobeCategory === 'string' && file.adobeCategory.toLowerCase().includes(searchTerm.toLowerCase())) {
+    const key = `category:${file.adobeCategory}`;
+    suggestions.set(key, { 
+      type: 'category', 
+      count: (suggestions.get(key)?.count || 0) + 1 
+    });
+  }
+
+  // Descriptions
+  if (typeof file.description === 'string' && file.description.toLowerCase().includes(searchTerm.toLowerCase())) {
+    const words = file.description.split(' ').filter(word => 
+      typeof word === 'string' && word.length > 3 && word.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    words.forEach(word => {
+      const key = `description:${word}`;
+      suggestions.set(key, { 
+        type: 'description', 
+        count: (suggestions.get(key)?.count || 0) + 1 
+      });
+    });
+  }
+});
+
 
     return Array.from(suggestions.entries())
       .map(([key, data]) => ({
