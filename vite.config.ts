@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0', // Слушаем на всех интерфейсах
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
       '/uploads': {
@@ -17,14 +17,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       }
-    },
-    // Настройка для SPA маршрутизации
-    historyApiFallback: true
+    }
   },
-  preview: {
-    host: '0.0.0.0',
-    port: 5173,
-    // Для production preview тоже нужна поддержка SPA
-    historyApiFallback: true
-  }
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 });
