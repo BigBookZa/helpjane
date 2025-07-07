@@ -43,7 +43,7 @@ const Projects: React.FC = () => {
       console.error('Failed to load projects:', error);
       showError('Failed to load projects');
     });
-  }, [loadProjects, showError]);
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
