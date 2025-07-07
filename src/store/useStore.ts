@@ -214,16 +214,26 @@ export const useStore = create<AppState>()(
       },
 
       loadProjects: async () => {
-        try {
-          set({ isLoading: true, error: null });
-          const projects = await getProjects();
-          set({ projects, isLoading: false });
-        } catch (error: any) {
-          set({ 
-            error: error.response?.data?.error || 'Failed to load projects',
-            isLoading: false 
-          });
-        }
+      try {
+        set({ isLoading: true, error: null });
+        const apiProjects = await getProjects();
+        
+        // Преобразуем данные из API в формат UI
+        const projects = apiProjects.map((project: any) => ({
+          ...project,
+          filesCount: project.files_count,
+          processed: project.processed_count,
+          errors: project.error_count,
+          updated: project.updated_at
+        }));
+        
+        set({ projects, isLoading: false });
+          } catch (error: any) {
+            set({
+              error: error.response?.data?.error || 'Failed to load projects',
+              isLoading: false
+            });
+          }
       },
 
       loadSettings: async () => {
