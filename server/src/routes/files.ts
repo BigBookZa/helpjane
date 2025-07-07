@@ -193,7 +193,20 @@ router.get('/project/:projectId', async (req, res) => {
     }
 
     const files = await FileModel.findByProject(projectId, { page, limit, status });
-    res.json(files);
+
+    // Формируем абсолютные ссылки
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const filesWithThumbnails = files.map(f => ({
+      ...f,
+      thumbnail: f.thumbnail_path
+        ? baseUrl + f.thumbnail_path.replace(/\\/g, '/').replace(/^.*\/uploads/, '/uploads')
+        : '',
+      url: f.file_path
+        ? baseUrl + f.file_path.replace(/\\/g, '/').replace(/^.*\/uploads/, '/uploads')
+        : ''
+    }));
+
+    res.json(filesWithThumbnails);
   } catch (error) {
     console.error('Get project files error:', error);
     res.status(500).json({ error: 'Failed to fetch files' });
