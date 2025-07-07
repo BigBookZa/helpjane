@@ -123,7 +123,7 @@ const ProjectDetail: React.FC = () => {
     adobeCategory: '',
     attempts: 0,
     processingTime: '',
-    thumbnail: file.url || '', // ПУТЬ С СЕРВЕРА // <-- если сервер отдаёт ссылку, иначе пусть будет пусто
+    thumbnail: file.thumbnail || file.thumbnailUrl || '',// ПУТЬ С СЕРВЕРА // <-- если сервер отдаёт ссылку, иначе пусть будет пусто
     notes: '',
     tags: []
   }));
