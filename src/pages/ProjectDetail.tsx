@@ -107,30 +107,33 @@ const ProjectDetail: React.FC = () => {
     );
   };
 
-  const handleFilesUploaded = (uploadedFiles: File[]) => {
-    const newFiles = uploadedFiles.map(file => ({
-      projectId: projectId,
-      filename: file.name,
-      newNamePhoto: '',
-      titleAdobe: '',
-      size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
-      uploaded: new Date().toISOString(),
-      status: 'queued' as const,
-      description: '',
-      keywords: [],
-      prompt: '',
-      keysAdobe: [],
-      adobeCategory: '',
-      attempts: 0,
-      processingTime: '',
-      thumbnail: URL.createObjectURL(file),
-      notes: '',
-      tags: []
-    }));
+  const handleFilesUploaded = (uploadedFiles: any[]) => {
+  const newFiles = uploadedFiles.map(file => ({
+    projectId: projectId,
+    filename: file.name,
+    newNamePhoto: '',
+    titleAdobe: '',
+    size: file.size ? (file.size / (1024 * 1024)).toFixed(2) + ' MB' : '',
+    uploaded: new Date().toISOString(),
+    status: 'queued' as const,
+    description: '',
+    keywords: [],
+    prompt: '',
+    keysAdobe: [],
+    adobeCategory: '',
+    attempts: 0,
+    processingTime: '',
+    thumbnail: file instanceof File
+      ? URL.createObjectURL(file)
+      : (file.thumbnailUrl || ''), // <-- если сервер отдаёт ссылку, иначе пусть будет пусто
+    notes: '',
+    tags: []
+  }));
 
-    addFiles(newFiles);
-    setShowUpload(false);
-  };
+  addFiles(newFiles);
+  setShowUpload(false);
+};
+
 
   const handleExportCSV = () => {
     const exportData = filteredFiles.map(file => ({
