@@ -413,62 +413,74 @@ const Projects: React.FC = () => {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex-1 max-w-lg">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="flex flex-col space-y-4">
+          {/* Search and View Toggle Row */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+            <div className="flex-1 max-w-lg">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            {/* View Mode Toggle - Made more prominent */}
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-gray-700">View:</span>
+              <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`px-4 py-2 transition-colors duration-200 flex items-center space-x-2 ${
+                    viewMode === 'grid' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                  title="Grid view"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Grid</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-4 py-2 transition-colors duration-200 flex items-center space-x-2 border-l-2 border-gray-300 ${
+                    viewMode === 'list' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
+                  title="List view"
+                >
+                  <List className="w-4 h-4" />
+                  <span className="text-sm font-medium">List</span>
+                </button>
+              </div>
             </div>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="processing">Processing</option>
-              <option value="completed">Completed</option>
-              <option value="error">Error</option>
-              <option value="paused">Paused</option>
-            </select>
-            
-            <button className="p-2 text-gray-400 hover:text-gray-600 border border-gray-300 rounded-lg">
-              <Filter className="w-4 h-4" />
-            </button>
-            
-            {/* View Mode Toggle */}
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-2 transition-colors duration-200 flex items-center space-x-1 ${
-                  viewMode === 'grid' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                }`}
-                title="Grid view"
+          {/* Filters Row */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Current view: <span className="font-medium text-gray-900">{viewMode === 'grid' ? 'Grid' : 'List'}</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <Grid3X3 className="w-4 h-4" />
-                <span className="text-sm font-medium">Grid</span>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-2 transition-colors duration-200 flex items-center space-x-1 border-l border-gray-300 ${
-                  viewMode === 'list' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                }`}
-                title="List view"
-              >
-                <List className="w-4 h-4" />
-                <span className="text-sm font-medium">List</span>
+                <option value="all">All Status</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="error">Error</option>
+                <option value="paused">Paused</option>
+              </select>
+              
+              <button className="p-2 text-gray-400 hover:text-gray-600 border border-gray-300 rounded-lg">
+                <Filter className="w-4 h-4" />
               </button>
             </div>
           </div>
