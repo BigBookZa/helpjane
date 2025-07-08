@@ -306,3 +306,113 @@ For support and questions:
 - [ ] Team collaboration features
 - [ ] Mobile application
 - [ ] Plugin system for extensibility
+```
+helpjane
+├─ .bolt
+│  ├─ config.json
+│  └─ prompt
+├─ diagnostic.sh
+├─ eslint.config.js
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.js
+├─ README.md
+├─ server
+│  ├─ package-lock.json
+│  ├─ package.json
+│  ├─ src
+│  │  ├─ controllers
+│  │  │  ├─ dashboardController.ts
+│  │  │  └─ settingsController.ts
+│  │  ├─ database
+│  │  │  ├─ connection.ts
+│  │  │  ├─ migrate.ts
+│  │  │  ├─ schema.sql
+│  │  │  └─ seed.ts
+│  │  ├─ index.ts
+│  │  ├─ middleware
+│  │  │  ├─ auth.ts
+│  │  │  └─ errorHandler.ts
+│  │  ├─ models
+│  │  │  ├─ ApiUsage.ts
+│  │  │  ├─ File.ts
+│  │  │  ├─ Project.ts
+│  │  │  ├─ Queue.ts
+│  │  │  ├─ Settings.ts
+│  │  │  └─ User.ts
+│  │  ├─ routes
+│  │  │  ├─ auth.ts
+│  │  │  ├─ dashboard.ts
+│  │  │  ├─ files.ts
+│  │  │  ├─ notifications.ts
+│  │  │  ├─ projects.ts
+│  │  │  ├─ queue.ts
+│  │  │  ├─ settings.ts
+│  │  │  └─ templates.ts
+│  │  └─ utils
+│  │     ├─ activityLogger.ts
+│  │     └─ logger.ts
+│  └─ tsconfig.json
+├─ setup.sh
+├─ src
+│  ├─ App.tsx
+│  ├─ components
+│  │  ├─ ActivityLog.tsx
+│  │  ├─ AdvancedFilters.tsx
+│  │  ├─ AuthProvider.tsx
+│  │  ├─ BulkEditModal.tsx
+│  │  ├─ ErrorBoundary.tsx
+│  │  ├─ FileEditModal.tsx
+│  │  ├─ FileUpload.tsx
+│  │  ├─ Header.tsx
+│  │  ├─ ImportExportModal.tsx
+│  │  ├─ Layout.tsx
+│  │  ├─ LoginForm.tsx
+│  │  ├─ NotificationCenter.tsx
+│  │  ├─ ProjectModal.tsx
+│  │  ├─ QueueMonitor.tsx
+│  │  ├─ RecentProjects.tsx
+│  │  ├─ SearchBar.tsx
+│  │  ├─ Sidebar.tsx
+│  │  ├─ StatsCard.tsx
+│  │  ├─ SystemMonitor.tsx
+│  │  └─ TemplateEditor.tsx
+│  ├─ hooks
+│  │  ├─ useNotifications.ts
+│  │  └─ useSearch.ts
+│  ├─ index.css
+│  ├─ main.tsx
+│  ├─ pages
+│  │  ├─ Dashboard.tsx
+│  │  ├─ ProjectDetail.tsx
+│  │  ├─ Projects.tsx
+│  │  ├─ Settings.tsx
+│  │  └─ Templates.tsx
+│  ├─ services
+│  │  ├─ api.ts
+│  │  └─ queue.ts
+│  ├─ store
+│  │  └─ useStore.ts
+│  ├─ types
+│  │  └─ lucide-react.d.ts
+│  ├─ utils
+│  │  ├─ csvUtils.ts
+│  │  ├─ dateUtils.ts
+│  │  └─ fileUtils.ts
+│  └─ vite-env.d.ts
+├─ supabase
+│  └─ migrations
+│     ├─ 20250703184035_graceful_trail.sql
+│     ├─ 20250704011554_late_unit.sql
+│     ├─ 20250704012212_sweet_temple.sql
+│     └─ schema.sql
+├─ tailwind.config.js
+├─ tests
+│  └─ manual-test-checklist.md
+├─ tsconfig.app.json
+├─ tsconfig.json
+├─ tsconfig.node.json
+└─ vite.config.ts
+
+```
