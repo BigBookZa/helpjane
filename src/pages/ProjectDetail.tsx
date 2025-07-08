@@ -35,13 +35,17 @@ const ProjectDetail: React.FC = () => {
   
 const files = useStore((state) => state.files.filter(f => f.projectId === projectId));
 const loadProjectFiles = useStore((state) => state.loadProjectFiles);
-
+ const loadProjects = useStore((state) => state.loadProjects);
 // Добавляем useEffect для загрузки файлов
 useEffect(() => {
   if (projectId) {
+    // Если проектов нет - загружаем их
+    if (projects.length === 0) {
+      loadProjects();
+    }
     loadProjectFiles(projectId);
   }
-}, [projectId, loadProjectFiles]);
+}, [projectId, loadProjectFiles, loadProjects, projects.length]);
   const projects = useStore((state) => state.projects);
   const selectedFiles = useStore((state) => state.selectedFiles);
   const setSelectedFiles = useStore((state) => state.setSelectedFiles);
