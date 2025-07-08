@@ -128,7 +128,11 @@ const Projects: React.FC = () => {
   };
 
   const renderProjectCard = (project: any) => (
-    <div key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+    <div 
+      key={project.id} 
+      className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200 cursor-pointer"
+      onClick={() => handleViewProject(project.id)}
+    >
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
@@ -140,7 +144,10 @@ const Projects: React.FC = () => {
           </div>
           <div className="relative">
             <button
-              onClick={() => setShowDropdown(showDropdown === project.id ? null : project.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDropdown(showDropdown === project.id ? null : project.id);
+              }}
               className="ml-2 p-1 text-gray-400 hover:text-gray-600"
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -236,12 +243,9 @@ const Projects: React.FC = () => {
               <Calendar className="w-3 h-3" />
               <span>Updated {new Date(project.updated).toLocaleDateString()}</span>
             </div>
-            <button
-              onClick={() => handleViewProject(project.id)}
-              className="text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
-            >
-              View Details
-            </button>
+            <div className="text-blue-600 font-medium">
+              Click to view details
+            </div>
           </div>
         </div>
       </div>
@@ -249,7 +253,11 @@ const Projects: React.FC = () => {
   );
 
   const renderProjectListItem = (project: any) => (
-    <div key={project.id} className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
+    <div 
+      key={project.id} 
+      className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+      onClick={() => handleViewProject(project.id)}
+    >
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6 flex-1 min-w-0">
@@ -321,7 +329,10 @@ const Projects: React.FC = () => {
 
             <div className="relative">
               <button
-                onClick={() => setShowDropdown(showDropdown === project.id ? null : project.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDropdown(showDropdown === project.id ? null : project.id);
+                }}
                 className="p-1 text-gray-400 hover:text-gray-600"
               >
                 <MoreHorizontal className="w-4 h-4" />
