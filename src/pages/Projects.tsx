@@ -147,7 +147,7 @@ const Projects: React.FC = () => {
             </button>
 
             {showDropdown === project.id && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[100]">
                 <div className="py-1">
                   <button
                     onClick={() => handleViewProject(project.id)}
@@ -328,7 +328,7 @@ const Projects: React.FC = () => {
               </button>
 
               {showDropdown === project.id && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-[100]">
                   <div className="py-1">
                     <button
                       onClick={() => handleViewProject(project.id)}
@@ -489,7 +489,7 @@ const Projects: React.FC = () => {
           {filteredProjects.map(renderProjectCard)}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="divide-y divide-gray-200">
             {filteredProjects.map(renderProjectListItem)}
           </div>
