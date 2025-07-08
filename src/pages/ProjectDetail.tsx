@@ -909,7 +909,7 @@ const ProjectDetail: React.FC = () => {
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
                           src={file.thumbnail}
-                          alt={file.original_filename || file.filename}
+                          alt={file['original_filename'] || file.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -917,9 +917,9 @@ const ProjectDetail: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {file.newNamePhoto || file.original_filename || file.filename}
+                          {file.newNamePhoto || file['original_filename'] || file.filename}
                         </p>
-                        <p className="text-xs text-gray-500">{file.original_filename || file.filename}</p>
+                        <p className="text-xs text-gray-500">{file['original_filename'] || file.filename}</p>
                       </div>
                     </td>
                     <td className="p-4">

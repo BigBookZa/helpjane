@@ -288,7 +288,7 @@ const FileEditModal: React.FC<FileEditModalProps> = ({
                 <span>Edit File</span>
                 {isDirty && <div className="w-2 h-2 bg-orange-500 rounded-full" title="Unsaved changes" />}
               </h2>
-              <p className="text-sm text-gray-600">{file.original_filename || file.filename}</p>
+              <p className="text-sm text-gray-600">{file['original_filename'] || file.filename}</p>
             </div>
           </div>
           
@@ -364,7 +364,7 @@ const FileEditModal: React.FC<FileEditModalProps> = ({
               <div className="flex-1 bg-white rounded-lg overflow-hidden flex items-center justify-center shadow-sm">
                 <img
                   src={file.thumbnail}
-                  alt={file.original_filename || file.filename}
+                  alt={file['original_filename'] || file.filename}
                   className="max-w-full max-h-full object-contain"
                 />
               </div>
@@ -373,7 +373,7 @@ const FileEditModal: React.FC<FileEditModalProps> = ({
                 <div className="text-sm">
                   <div className="flex items-center justify-between py-1">
                     <span className="text-gray-600">Original:</span>
-                    <span className="font-medium truncate ml-2">{file.original_filename || file.filename}</span>
+                    <span className="font-medium truncate ml-2">{file['original_filename'] || file.filename}</span>
                   </div>
                   <div className="flex items-center justify-between py-1">
                     <span className="text-gray-600">Size:</span>
