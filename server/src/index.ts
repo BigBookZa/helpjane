@@ -26,14 +26,14 @@ if (!initializeDatabase()) {
   process.exit(1);
 }
 
-// CORS configuration - MUST be before other middleware
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://185.106.95.157:5173',
-    process.env.FRONTEND_URL || 'http://localhost:5173'
-  ],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -95,8 +95,18 @@ app.use('/api/settings', authenticateToken, settingsRoutes);
 app.use('/api/queue', authenticateToken, queueRoutes);
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 
-// Serve static files (uploads)
-app.use('/uploads', express.static('uploads'));
+// Serve static files (uploads) with CORS
+app.use('/uploads', cors({
+  origin: allowedOrigins,
+  credentials: false,
+  methods: ['GET', 'OPTIONS'],
+  optionsSuccessStatus: 200
+}), express.static('uploads', {
+  setHeaders: (res, path, stat) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Cache-Control', 'public, max-age=31536000');
+  }
+}));
 
 // 404 handler
 app.use('*', (req, res) => {

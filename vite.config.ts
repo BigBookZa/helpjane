@@ -11,6 +11,7 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path
       },
       '/api': {
         target: 'http://localhost:3001',
@@ -18,12 +19,5 @@ export default defineConfig({
         secure: false,
       }
     }
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-      },
-    },
-  },
+  }
 });
