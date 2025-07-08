@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -31,6 +31,7 @@ const Projects: React.FC = () => {
   const { showSuccess, showError } = useNotifications();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -40,6 +41,14 @@ const Projects: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Debounce для поиска
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Загружаем проекты при монтировании компонента
   useEffect(() => {
     loadProjects().catch(error => {
@@ -48,50 +57,77 @@ const Projects: React.FC = () => {
     });
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'processing':
-        return <Clock className="w-4 h-4 text-orange-500" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
+  // Статические конфигурации для статусов
+  const statusConfig = useMemo(() => ({
+    completed: {
+      icon: <CheckCircle className="w-4 h-4 text-green-500" />,
+      badge: 'bg-green-100 text-green-800'
+    },
+    processing: {
+      icon: <Clock className="w-4 h-4 text-orange-500" />,
+      badge: 'bg-orange-100 text-orange-800'
+    },
+    error: {
+      icon: <AlertCircle className="w-4 h-4 text-red-500" />,
+      badge: 'bg-red-100 text-red-800'
+    },
+    paused: {
+      icon: <Clock className="w-4 h-4 text-gray-400" />,
+      badge: 'bg-gray-100 text-gray-800'
     }
-  };
+  }), []);
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      completed: 'bg-green-100 text-green-800',
-      processing: 'bg-orange-100 text-orange-800',
-      error: 'bg-red-100 text-red-800',
-      paused: 'bg-gray-100 text-gray-800'
-    };
+  // Оптимизированные функции для получения статуса
+  const getStatusIcon = useCallback((status: string) => {
+    return statusConfig[status as keyof typeof statusConfig]?.icon || statusConfig.paused.icon;
+  }, [statusConfig]);
 
-    return statusConfig[status as keyof typeof statusConfig] || statusConfig.paused;
-  };
+  const getStatusBadge = useCallback((status: string) => {
+    return statusConfig[status as keyof typeof statusConfig]?.badge || statusConfig.paused.badge;
+  }, [statusConfig]);
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesFilter = filterStatus === 'all' || project.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  // Оптимизированная функция для расчета прогресса
+  const getProgressPercentage = useCallback((processed: number, total: number) => {
+    return total > 0 ? (processed / total) * 100 : 0;
+  }, []);
 
-  const handleCreateProject = () => {
+  // Оптимизированная функция для форматирования даты
+  const formatDate = useCallback((dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  }, []);
+
+  // Оптимизированная фильтрация проектов с debounce
+  const filteredProjects = useMemo(() => {
+    if (!debouncedSearchTerm && filterStatus === 'all') {
+      return projects;
+    }
+
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    return projects.filter(project => {
+      const matchesSearch = !debouncedSearchTerm || 
+        project.name.toLowerCase().includes(searchLower) ||
+        project.description.toLowerCase().includes(searchLower) ||
+        project.tags.some(tag => tag.toLowerCase().includes(searchLower));
+      
+      const matchesFilter = filterStatus === 'all' || project.status === filterStatus;
+      
+      return matchesSearch && matchesFilter;
+    });
+  }, [projects, debouncedSearchTerm, filterStatus]);
+
+  // Мемоизированные обработчики событий
+  const handleCreateProject = useCallback(() => {
     setEditingProject(null);
     setShowProjectModal(true);
-  };
+  }, []);
 
-  const handleEditProject = (project: any) => {
+  const handleEditProject = useCallback((project: any) => {
     setEditingProject(project);
     setShowProjectModal(true);
     setShowDropdown(null);
-  };
+  }, []);
 
-  const handleDeleteProject = (projectId: number) => {
+  const handleDeleteProject = useCallback((projectId: number) => {
     if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
       try {
         deleteProject(projectId);
@@ -102,31 +138,53 @@ const Projects: React.FC = () => {
       }
     }
     setShowDropdown(null);
-  };
+  }, [deleteProject, showSuccess, showError]);
 
-  const handleViewProject = (projectId: number) => {
+  const handleViewProject = useCallback((projectId: number) => {
     navigate(`/projects/${projectId}`);
-  };
+  }, [navigate]);
 
-  const handleExportProject = (projectId: number) => {
+  const handleExportProject = useCallback((projectId: number) => {
     setSelectedProjectId(projectId);
     setImportExportMode('export');
     setShowImportExportModal(true);
     setShowDropdown(null);
-  };
+  }, []);
 
-  const handleImportProjects = () => {
+  const handleImportProjects = useCallback(() => {
     setSelectedProjectId(undefined);
     setImportExportMode('import');
     setShowImportExportModal(true);
-  };
+  }, []);
 
-  const handleExportAll = () => {
+  const handleExportAll = useCallback(() => {
     setSelectedProjectId(undefined);
     setImportExportMode('export');
     setShowImportExportModal(true);
-  };
+  }, []);
 
+  const handleCloseProjectModal = useCallback(() => {
+    setShowProjectModal(false);
+    setEditingProject(null);
+  }, []);
+
+  const handleCloseImportExportModal = useCallback(() => {
+    setShowImportExportModal(false);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm('');
+  }, []);
+
+  const handleDropdownToggle = useCallback((projectId: number) => {
+    setShowDropdown(prev => prev === projectId ? null : projectId);
+  }, []);
+
+  const handleViewModeToggle = useCallback((mode: 'grid' | 'list') => {
+    setViewMode(mode);
+  }, []);
+
+  // Render функции (оставлены без изменений для безопасности)
   const renderProjectCard = (project: any) => (
     <div 
       key={project.id} 
@@ -146,7 +204,7 @@ const Projects: React.FC = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setShowDropdown(showDropdown === project.id ? null : project.id);
+                handleDropdownToggle(project.id);
               }}
               className="ml-2 p-1 text-gray-400 hover:text-gray-600"
             >
@@ -230,7 +288,7 @@ const Projects: React.FC = () => {
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${project.filesCount > 0 ? (project.processed / project.filesCount) * 100 : 0}%` }}
+                style={{ width: `${getProgressPercentage(project.processed, project.filesCount)}%` }}
               ></div>
             </div>
             {project.errors > 0 && (
@@ -241,7 +299,7 @@ const Projects: React.FC = () => {
           <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
             <div className="flex items-center space-x-1">
               <Calendar className="w-3 h-3" />
-              <span>Updated {new Date(project.updated).toLocaleDateString()}</span>
+              <span>Updated {formatDate(project.updated)}</span>
             </div>
             <div className="text-blue-600 font-medium">
               Click to view details
@@ -313,7 +371,7 @@ const Projects: React.FC = () => {
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${project.filesCount > 0 ? (project.processed / project.filesCount) * 100 : 0}%` }}
+                  style={{ width: `${getProgressPercentage(project.processed, project.filesCount)}%` }}
                 ></div>
               </div>
             </div>
@@ -324,14 +382,14 @@ const Projects: React.FC = () => {
 
             <div className="flex items-center space-x-1 text-xs text-gray-500">
               <Calendar className="w-3 h-3" />
-              <span>{new Date(project.updated).toLocaleDateString()}</span>
+              <span>{formatDate(project.updated)}</span>
             </div>
 
             <div className="relative">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowDropdown(showDropdown === project.id ? null : project.id);
+                  handleDropdownToggle(project.id);
                 }}
                 className="p-1 text-gray-400 hover:text-gray-600"
               >
@@ -466,7 +524,7 @@ const Projects: React.FC = () => {
             {/* View Mode Toggle */}
             <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
               <button
-                onClick={() => setViewMode('grid')}
+                onClick={() => handleViewModeToggle('grid')}
                 className={`px-3 py-2 flex items-center space-x-1 transition-colors duration-200 ${
                   viewMode === 'grid'
                     ? 'bg-blue-600 text-white'
@@ -478,7 +536,7 @@ const Projects: React.FC = () => {
                 <span className="text-sm font-medium">Grid</span>
               </button>
               <button
-                onClick={() => setViewMode('list')}
+                onClick={() => handleViewModeToggle('list')}
                 className={`px-3 py-2 flex items-center space-x-1 border-l border-gray-300 transition-colors duration-200 ${
                   viewMode === 'list'
                     ? 'bg-blue-600 text-white'
@@ -518,7 +576,7 @@ const Projects: React.FC = () => {
             {searchTerm ? 'Try adjusting your search terms' : 'Create your first project to get started'}
           </p>
           <button
-            onClick={searchTerm ? () => setSearchTerm('') : handleCreateProject}
+            onClick={searchTerm ? handleClearSearch : handleCreateProject}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
           >
             {searchTerm ? 'Clear Search' : 'Create Project'}
@@ -530,15 +588,12 @@ const Projects: React.FC = () => {
       <ProjectModal
         project={editingProject}
         isOpen={showProjectModal}
-        onClose={() => {
-          setShowProjectModal(false);
-          setEditingProject(null);
-        }}
+        onClose={handleCloseProjectModal}
       />
 
       <ImportExportModal
         isOpen={showImportExportModal}
-        onClose={() => setShowImportExportModal(false)}
+        onClose={handleCloseImportExportModal}
         mode={importExportMode}
         projectId={selectedProjectId}
       />
