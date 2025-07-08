@@ -252,20 +252,20 @@ const Projects: React.FC = () => {
     <div key={project.id} className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200">
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-8 flex-1">
+          <div className="flex items-center space-x-6 flex-1 min-w-0">
             {/* Project Name and Status */}
-            <div className="flex items-center space-x-2 min-w-0 w-48">
+            <div className="flex items-center space-x-2 min-w-0 flex-1 max-w-xs">
               <h3 className="text-lg font-semibold text-gray-900 truncate">{project.name}</h3>
               {getStatusIcon(project.status)}
             </div>
 
             {/* Description */}
-            <div className="min-w-0 w-64">
+            <div className="min-w-0 flex-1 max-w-sm">
               <p className="text-sm text-gray-600 truncate">{project.description}</p>
             </div>
 
             {/* Tags */}
-            <div className="flex flex-wrap gap-1 min-w-0 w-32">
+            <div className="flex flex-wrap gap-1 min-w-0 w-40">
               {project.tags.slice(0, 2).map((tag) => (
                 <span key={tag} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full whitespace-nowrap">
                   {tag}
