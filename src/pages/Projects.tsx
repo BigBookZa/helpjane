@@ -445,33 +445,37 @@ const Projects: React.FC = () => {
             </button>
             
             {/* View Mode Toggle */}
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 transition-colors duration-200 ${
+                className={`px-3 py-2 transition-colors duration-200 flex items-center space-x-1 ${
                   viewMode === 'grid' 
                     ? 'bg-blue-600 text-white' 
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                 }`}
+                title="Grid view"
               >
                 <Grid3X3 className="w-4 h-4" />
+                <span className="text-sm font-medium">Grid</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 transition-colors duration-200 ${
+                className={`px-3 py-2 transition-colors duration-200 flex items-center space-x-1 border-l border-gray-300 ${
                   viewMode === 'list' 
                     ? 'bg-blue-600 text-white' 
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                 }`}
+                title="List view"
               >
                 <List className="w-4 h-4" />
+                <span className="text-sm font-medium">List</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Projects Display*/}
+      {/* Projects Display */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProjects.map(renderProjectCard)}
