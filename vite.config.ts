@@ -6,13 +6,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    historyApiFallback: true, 
     proxy: {
       '/uploads': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path
       },
       '/api': {
         target: 'http://localhost:3001',
@@ -20,5 +18,9 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 5173,
   }
 });
