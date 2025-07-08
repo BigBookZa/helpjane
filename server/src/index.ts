@@ -45,6 +45,13 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+console.log('Allowed origins:', allowedOrigins);
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url} - Origin: ${req.headers.origin}`);
+  console.log('CORS headers:', res.getHeaders());
+  next();
+});
+
 // Handle preflight requests
 app.options('*', cors());
 
