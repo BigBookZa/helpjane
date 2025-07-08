@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useStore } from './store/useStore';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './components/AuthProvider';
@@ -14,8 +15,14 @@ import { useNotifications } from './hooks/useNotifications';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
+  const loadProjects = useStore(state => state.loadProjects);  
   useNotifications();
-
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadProjects();
+    }
+  }, [isAuthenticated, loadProjects]);
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
