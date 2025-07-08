@@ -471,7 +471,7 @@ const Projects: React.FC = () => {
         </div>
       </div>
 
-      {/* Projects Display */}
+      {/* Projects Display*/}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProjects.map(renderProjectCard)}
