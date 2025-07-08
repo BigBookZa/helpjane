@@ -374,10 +374,63 @@ const Projects: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Projects 
+            <span style={{ 
+              marginLeft: '20px', 
+              fontSize: '18px', 
+              color: '#ef4444',
+              fontWeight: 'bold'
+            }}>
+              CURRENT VIEW: {viewMode.toUpperCase()}
+            </span>
+          </h1>
           <p className="text-gray-600 mt-1">Manage your AI image processing projects</p>
         </div>
         <div className="flex items-center space-x-3">
+          {/* EMERGENCY VIEW TOGGLE - INLINE STYLES */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            padding: '8px',
+            backgroundColor: '#fee2e2',
+            border: '3px solid #ef4444',
+            borderRadius: '8px'
+          }}>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#dc2626' }}>VIEW:</span>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: viewMode === 'grid' ? '#dc2626' : '#ffffff',
+                color: viewMode === 'grid' ? '#ffffff' : '#dc2626',
+                border: '2px solid #dc2626',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}
+            >
+              GRID
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: viewMode === 'list' ? '#dc2626' : '#ffffff',
+                color: viewMode === 'list' ? '#ffffff' : '#dc2626',
+                border: '2px solid #dc2626',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}
+            >
+              LIST
+            </button>
+          </div>
+          
           <button 
             onClick={handleImportProjects}
             className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
