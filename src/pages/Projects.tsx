@@ -429,33 +429,81 @@ const Projects: React.FC = () => {
               </div>
             </div>
             
-            {/* View Mode Toggle - Made more prominent */}
-            <div className="flex items-center space-x-3">
-              <span className="text-sm font-medium text-gray-700">View:</span>
-              <div className="flex items-center border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
+            {/* View Mode Toggle - With inline styles for visibility */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>View:</span>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                border: '2px solid #d1d5db', 
+                borderRadius: '8px', 
+                overflow: 'hidden',
+                backgroundColor: '#ffffff'
+              }}>
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`px-4 py-2 transition-colors duration-200 flex items-center space-x-2 ${
-                    viewMode === 'grid' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                  }`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    backgroundColor: viewMode === 'grid' ? '#2563eb' : '#ffffff',
+                    color: viewMode === 'grid' ? '#ffffff' : '#4b5563',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
                   title="Grid view"
+                  onMouseEnter={(e) => {
+                    if (viewMode !== 'grid') {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.color = '#1f2937';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (viewMode !== 'grid') {
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.color = '#4b5563';
+                    }
+                  }}
                 >
-                  <Grid3X3 className="w-4 h-4" />
-                  <span className="text-sm font-medium">Grid</span>
+                  <Grid3X3 style={{ width: '16px', height: '16px' }} />
+                  <span>Grid</span>
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-4 py-2 transition-colors duration-200 flex items-center space-x-2 border-l-2 border-gray-300 ${
-                    viewMode === 'list' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                  }`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    backgroundColor: viewMode === 'list' ? '#2563eb' : '#ffffff',
+                    color: viewMode === 'list' ? '#ffffff' : '#4b5563',
+                    border: 'none',
+                    borderLeft: '2px solid #d1d5db',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                  }}
                   title="List view"
+                  onMouseEnter={(e) => {
+                    if (viewMode !== 'list') {
+                      e.target.style.backgroundColor = '#f9fafb';
+                      e.target.style.color = '#1f2937';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (viewMode !== 'list') {
+                      e.target.style.backgroundColor = '#ffffff';
+                      e.target.style.color = '#4b5563';
+                    }
+                  }}
                 >
-                  <List className="w-4 h-4" />
-                  <span className="text-sm font-medium">List</span>
+                  <List style={{ width: '16px', height: '16px' }} />
+                  <span>List</span>
                 </button>
               </div>
             </div>
