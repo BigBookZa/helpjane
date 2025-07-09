@@ -321,11 +321,8 @@ const ProjectDetail: React.FC = () => {
     const isExpanded = expandedCards.has(file.id);
     const isSelected = selectedFiles.includes(file.id);
     
-    // Debug: показываем все поля файла в консоли
-    console.log('File object:', file);
-    console.log('Available fields:', Object.keys(file));
-    console.log('original_filename:', file.original_filename);
-    console.log('filename:', file.filename);
+    // Правильное получение имени файла
+    const displayName = file.newNamePhoto || file.original_filename || file['original_filename'] || file.filename;
     
     return (
       <div className={`bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
@@ -344,7 +341,7 @@ const ProjectDetail: React.FC = () => {
               <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                 <img
                   src={file.thumbnail}
-                  alt={file.original_filename || file.filename}
+                  alt={displayName}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -372,7 +369,7 @@ const ProjectDetail: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-start justify-between">
               <h4 className="text-sm font-medium text-gray-900 flex-1 pr-2">
-                {file.newNamePhoto || file.original_filename || file.filename}
+                {displayName}
               </h4>
               <button
                 onClick={() => toggleCardExpansion(file.id)}
@@ -916,7 +913,7 @@ const ProjectDetail: React.FC = () => {
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
                           src={file.thumbnail}
-                          alt={file.original_filename || file.filename}
+                          alt={file.original_filename || file['original_filename'] || file.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -924,10 +921,10 @@ const ProjectDetail: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {file.newNamePhoto || file.original_filename || file.filename}
+                          {file.original_filename || file['original_filename'] || file.filename}
                         </p>
-                        {file.original_filename && file.original_filename !== file.filename && (
-                          <p className="text-xs text-gray-500">Original: {file.original_filename}</p>
+                        {file.newNamePhoto && (
+                          <p className="text-xs text-gray-500">Custom: {file.newNamePhoto}</p>
                         )}
                       </div>
                     </td>
@@ -1107,7 +1104,7 @@ const ProjectDetail: React.FC = () => {
                       />
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">
-                      {file.original_filename || file.filename}
+                      {file.original_filename || file['original_filename'] || file.filename}
                     </p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-gray-500">{file.size}</span>
