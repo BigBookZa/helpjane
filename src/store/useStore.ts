@@ -27,6 +27,7 @@ export interface FileData {
   id: number;
   projectId: number;
   filename: string;
+  original_filename?: string; // оригинальное имя файла
   newNamePhoto: string;
   titleAdobe: string;
   size: string;
@@ -37,12 +38,26 @@ export interface FileData {
   prompt: string;
   keysAdobe: string[];
   adobeCategory: string;
-  attempts: number;
-  processingTime: string;
+  attempts: number; // количество попыток обработки
+  processingTime: string; // время обработки
   thumbnail: string;
   notes: string;
   error?: string;
   tags: string[];
+  // Дополнительные поля из API
+  file_size?: number; // размер файла в байтах
+  file_path?: string; // путь к файлу
+  thumbnail_path?: string; // путь к миниатюре
+  mime_type?: string; // тип файла
+  ai_response?: string; // ответ AI
+  tokens_used?: number; // использованные токены
+  created_at?: string; // время создания
+  updated_at?: string; // время обновления
+  processed_at?: string; // время завершения обработки
+  url?: string; // URL файла
+  errorDetails?: string; // детали ошибки (для UI)
+  processingProgress?: number; // прогресс обработки (для UI)
+  lastModified?: string; // последнее изменение (для UI)
 }
 
 export interface Template {
@@ -141,10 +156,9 @@ interface AppState {
   error: string | null;
   
   // Actions
-
   loadDashboardData: () => Promise<void>;
   loadProjects: () => Promise<void>;
-  loadProjectFiles: (projectId: number) => Promise<void>;  // <-- добавьте эту строку
+  loadProjectFiles: (projectId: number) => Promise<void>;
   loadSettings: () => Promise<void>;
   
   addProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => void;
@@ -221,26 +235,26 @@ export const useStore = create<AppState>()(
       },
 
       loadProjects: async () => {
-      try {
-        set({ isLoading: true, error: null });
-        const apiProjects = await getProjects();
-        
-        // Преобразуем данные из API в формат UI
-        const projects = apiProjects.map((project: any) => ({
-          ...project,
-          filesCount: project.files_count,
-          processed: project.processed_count,
-          errors: project.error_count,
-          updated: project.updated_at
-        }));
-        
-        set({ projects, isLoading: false });
-          } catch (error: any) {
-            set({
-              error: error.response?.data?.error || 'Failed to load projects',
-              isLoading: false
-            });
-          }
+        try {
+          set({ isLoading: true, error: null });
+          const apiProjects = await getProjects();
+          
+          // Преобразуем данные из API в формат UI
+          const projects = apiProjects.map((project: any) => ({
+            ...project,
+            filesCount: project.files_count,
+            processed: project.processed_count,
+            errors: project.error_count,
+            updated: project.updated_at
+          }));
+          
+          set({ projects, isLoading: false });
+        } catch (error: any) {
+          set({
+            error: error.response?.data?.error || 'Failed to load projects',
+            isLoading: false
+          });
+        }
       },
 
       loadSettings: async () => {
@@ -251,16 +265,18 @@ export const useStore = create<AppState>()(
           console.error('Failed to load settings:', error);
         }
       },
+
       loadProjectFiles: async (projectId: number) => {
         try {
           set({ isLoading: true, error: null });
           const apiFiles = await getProjectFiles(projectId);
           
-          // Преобразуем данные из API в формат UI
+          // Правильно маппим все поля из API
           const files = apiFiles.map((file: any) => ({
             id: file.id,
             projectId: file.project_id,
             filename: file.filename,
+            original_filename: file.original_filename,
             newNamePhoto: file.new_name_photo || '',
             titleAdobe: file.title_adobe || '',
             size: (file.file_size / (1024 * 1024)).toFixed(2) + ' MB',
@@ -276,7 +292,22 @@ export const useStore = create<AppState>()(
             thumbnail: file.thumbnail || '',
             notes: file.notes || '',
             error: file.error_message || '',
-            tags: file.tags || []
+            tags: file.tags || [],
+            // Дополнительные поля из API
+            file_size: file.file_size,
+            file_path: file.file_path,
+            thumbnail_path: file.thumbnail_path,
+            mime_type: file.mime_type,
+            ai_response: file.ai_response,
+            tokens_used: file.tokens_used || 0,
+            created_at: file.created_at,
+            updated_at: file.updated_at,
+            processed_at: file.processed_at,
+            url: file.url,
+            // UI поля
+            errorDetails: file.error_message || '',
+            processingProgress: 0,
+            lastModified: file.updated_at
           }));
           
           // Заменяем файлы для этого проекта
@@ -294,6 +325,7 @@ export const useStore = create<AppState>()(
           });
         }
       },
+
       // Project actions
       addProject: (projectData) => {
         const newProject: Project = {

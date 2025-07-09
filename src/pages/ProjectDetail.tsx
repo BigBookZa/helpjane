@@ -50,12 +50,6 @@ import { exportToCSV } from '../utils/csvUtils';
 type SortField = 'filename' | 'uploaded' | 'status' | 'size' | 'titleAdobe';
 type SortDirection = 'asc' | 'desc';
 
-interface FileWithDetails extends FileData {
-  processingProgress?: number;
-  errorDetails?: string;
-  lastModified?: string;
-}
-
 const ProjectDetail: React.FC = () => {
   const { id } = useParams();
   const projectId = parseInt(id || '0');
@@ -168,7 +162,7 @@ const ProjectDetail: React.FC = () => {
   }
 
   // Enhanced status icons with more detail
-  const getStatusIcon = (file: FileWithDetails) => {
+  const getStatusIcon = (file: FileData) => {
     switch (file.status) {
       case 'completed':
         return (
@@ -317,12 +311,12 @@ const ProjectDetail: React.FC = () => {
   const selectedFileObjects = sortedAndFilteredFiles.filter(f => selectedFiles.includes(f.id));
 
   // Enhanced File Card Component
-  const FileCard = ({ file }: { file: FileWithDetails }) => {
+  const FileCard = ({ file }: { file: FileData }) => {
     const isExpanded = expandedCards.has(file.id);
     const isSelected = selectedFiles.includes(file.id);
     
-    // Правильное получение имени файла
-    const displayName = file.newNamePhoto || file.original_filename || file['original_filename'] || file.filename;
+    // Правильное получение имени файла (теперь original_filename должно быть доступно)
+    const displayName = file.newNamePhoto || file.original_filename || file.filename;
     
     return (
       <div className={`bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
@@ -913,7 +907,7 @@ const ProjectDetail: React.FC = () => {
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
                           src={file.thumbnail}
-                          alt={file.original_filename || file['original_filename'] || file.filename}
+                          alt={file.original_filename || file.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -921,7 +915,7 @@ const ProjectDetail: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {file.original_filename || file['original_filename'] || file.filename}
+                          {file.original_filename || file.filename}
                         </p>
                         {file.newNamePhoto && (
                           <p className="text-xs text-gray-500">Custom: {file.newNamePhoto}</p>
@@ -1104,7 +1098,7 @@ const ProjectDetail: React.FC = () => {
                       />
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">
-                      {file.original_filename || file['original_filename'] || file.filename}
+                      {file.original_filename || file.filename}
                     </p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-gray-500">{file.size}</span>
