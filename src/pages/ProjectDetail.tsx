@@ -321,6 +321,12 @@ const ProjectDetail: React.FC = () => {
     const isExpanded = expandedCards.has(file.id);
     const isSelected = selectedFiles.includes(file.id);
     
+    // Debug: показываем все поля файла в консоли
+    console.log('File object:', file);
+    console.log('Available fields:', Object.keys(file));
+    console.log('original_filename:', file.original_filename);
+    console.log('filename:', file.filename);
+    
     return (
       <div className={`bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
         isSelected ? 'ring-2 ring-blue-500 border-blue-200' : 'border-gray-200'
@@ -366,7 +372,7 @@ const ProjectDetail: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-start justify-between">
               <h4 className="text-sm font-medium text-gray-900 flex-1 pr-2">
-                {file.original_filename || file.filename}
+                {file.newNamePhoto || file.original_filename || file.filename}
               </h4>
               <button
                 onClick={() => toggleCardExpansion(file.id)}
@@ -918,10 +924,10 @@ const ProjectDetail: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {file.original_filename || file.filename}
+                          {file.newNamePhoto || file.original_filename || file.filename}
                         </p>
-                        {file.newNamePhoto && (
-                          <p className="text-xs text-gray-500">New: {file.newNamePhoto}</p>
+                        {file.original_filename && file.original_filename !== file.filename && (
+                          <p className="text-xs text-gray-500">Original: {file.original_filename}</p>
                         )}
                       </div>
                     </td>
