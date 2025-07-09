@@ -248,6 +248,7 @@ const ProjectDetail: React.FC = () => {
     const newFiles = uploadedFiles.map(file => ({
       projectId: projectId,
       filename: file.name,
+      original_filename: file.originalName || file.name, // Сохраняем оригинальное имя
       newNamePhoto: '',
       titleAdobe: '',
       size: file.size ? (file.size / (1024 * 1024)).toFixed(2) + ' MB' : '',
@@ -337,7 +338,7 @@ const ProjectDetail: React.FC = () => {
               <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                 <img
                   src={file.thumbnail}
-                  alt={file.filename}
+                  alt={file.original_filename || file.filename}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -365,7 +366,7 @@ const ProjectDetail: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-start justify-between">
               <h4 className="text-sm font-medium text-gray-900 flex-1 pr-2">
-                {file.newNamePhoto || file.filename}
+                {file.original_filename || file.filename}
               </h4>
               <button
                 onClick={() => toggleCardExpansion(file.id)}
@@ -909,7 +910,7 @@ const ProjectDetail: React.FC = () => {
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
                           src={file.thumbnail}
-                          alt={file['original_filename'] || file.filename}
+                          alt={file.original_filename || file.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -917,9 +918,11 @@ const ProjectDetail: React.FC = () => {
                     <td className="p-4">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                          {file.newNamePhoto || file['original_filename'] || file.filename}
+                          {file.original_filename || file.filename}
                         </p>
-                        <p className="text-xs text-gray-500">{file['original_filename'] || file.filename}</p>
+                        {file.newNamePhoto && (
+                          <p className="text-xs text-gray-500">New: {file.newNamePhoto}</p>
+                        )}
                       </div>
                     </td>
                     <td className="p-4">
@@ -1093,12 +1096,12 @@ const ProjectDetail: React.FC = () => {
                     <div className="aspect-square bg-gray-100 rounded-lg mb-2 overflow-hidden">
                       <img
                         src={file.thumbnail}
-                        alt={file.filename}
+                        alt={file.original_filename || file.filename}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <p className="text-xs font-medium text-gray-900 truncate">
-                      {file.newNamePhoto || file.filename}
+                      {file.original_filename || file.filename}
                     </p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-xs text-gray-500">{file.size}</span>
